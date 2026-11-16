@@ -52,9 +52,14 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :app:testDebugUnitTest --stacktrace
 
-      - name: 构建 Debug APK（仅 PR）
-        if: github.event_name == 'pull_request'
+      - name: Build Debug APK
         run: ./gradlew :app:assembleDebug -Pumeng.enabled=false --stacktrace
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meapet-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: 上传测试报告
         if: always()
