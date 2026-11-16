@@ -33,14 +33,17 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -264,15 +267,21 @@ internal fun ModelParamsSection(
     )
 }
 
-/** Telegram Bot configuration: enable switch, bot token, optional chat ID filter, test button, notification permission. */
+/** Local Webhook configuration: enable switch, read-only local server URL, LAN IP hint, notification permission. */
 @Composable
 internal fun TelegramBotSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
-    local: SettingsLocalState,
+    @Suppress("UNUSED_PARAMETER") local: SettingsLocalState,
     darkTheme: Boolean
 ) {
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshWebhookUrls()
+    }
 
     SectionTitle(stringResource(R.string.telegram_section_title))
 
@@ -281,75 +290,55 @@ internal fun TelegramBotSection(
         description = stringResource(R.string.telegram_enable_desc),
         checked = state.telegramEnabled,
         darkTheme = darkTheme,
-        onCheckedChange = {
-            viewModel.saveTelegramBotToken(local.telegramBotToken)
-            viewModel.saveTelegramChatId(local.telegramChatId)
-            viewModel.updateTelegramEnabled(it)
-        }
+        onCheckedChange = { viewModel.updateTelegramEnabled(it) }
     )
 
     Spacer(Modifier.height(8.dp))
 
     OutlinedTextField(
-        value = local.telegramBotToken,
-        onValueChange = { local.telegramBotToken = it },
-        label = { Text(stringResource(R.string.telegram_bot_token)) },
-        placeholder = { Text(stringResource(R.string.telegram_bot_token_placeholder)) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .saveOnFocusChange { viewModel.saveTelegramBotToken(local.telegramBotToken) },
-        singleLine = true,
-        visualTransformation = if (local.telegramTokenVisible)
-            VisualTransformation.None
-        else
-            PasswordVisualTransformation(),
+        value = state.webhookServerUrl,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(stringResource(R.string.webhook_server_url_label)) },
+        supportingText = {
+            Text(stringResource(R.string.webhook_endpoint_hint))
+        },
         trailingIcon = {
             TextButton(
-                onClick = { local.telegramTokenVisible = !local.telegramTokenVisible },
-                modifier = Modifier.width(64.dp)
+                onClick = {
+                    clipboard.setText(AnnotatedString(state.webhookServerUrl))
+                    copied = true
+                },
+                modifier = Modifier.width(72.dp)
             ) {
                 Text(
-                    text = if (local.telegramTokenVisible) stringResource(R.string.action_hide)
-                           else stringResource(R.string.action_show),
+                    text = if (copied) stringResource(R.string.action_copied)
+                    else stringResource(R.string.action_copy),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-        }
-    )
-
-    Spacer(Modifier.height(8.dp))
-
-    OutlinedTextField(
-        value = local.telegramChatId,
-        onValueChange = { local.telegramChatId = it },
-        label = { Text(stringResource(R.string.telegram_chat_id)) },
-        placeholder = { Text(stringResource(R.string.telegram_chat_id_placeholder)) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .saveOnFocusChange { viewModel.saveTelegramChatId(local.telegramChatId) },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-    )
-
-    Spacer(Modifier.height(8.dp))
-
-    OutlinedButton(
-        onClick = {
-            viewModel.saveTelegramBotToken(local.telegramBotToken)
-            viewModel.saveTelegramChatId(local.telegramChatId)
-            viewModel.testTelegramConnection(local.telegramBotToken)
         },
-        enabled = !state.telegramTesting,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        if (state.telegramTesting) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.telegram_testing))
-        } else {
-            Text(stringResource(R.string.telegram_test_connection))
-        }
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    if (state.webhookLanUrls.isNotEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(
+                R.string.webhook_lan_urls_hint,
+                state.webhookLanUrls.joinToString(", ")
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    clipboard.setText(AnnotatedString(state.webhookLanUrls.first()))
+                    copied = true
+                }
+        )
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -375,29 +364,5 @@ internal fun TelegramBotSection(
                 Text(stringResource(R.string.telegram_notif_permission_btn))
             }
         }
-    }
-
-    state.telegramTestResult?.let { msg ->
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = msg,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { viewModel.dismissTelegramFeedback() }
-        )
-    }
-
-    state.telegramTestError?.let { err ->
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = err,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { viewModel.dismissTelegramFeedback() }
-        )
     }
 }

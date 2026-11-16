@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.meapet.mobile.core.LocaleHelper
 import kotlinx.coroutines.CompletableDeferred
@@ -94,9 +93,6 @@ class SettingsManager(context: Context) {
     private val KEY_APP_LANGUAGE = stringPreferencesKey(SettingsKeys.APP_LANGUAGE)
     private val KEY_ACTIVE_LIVE2D_MODEL = stringPreferencesKey(SettingsKeys.ACTIVE_LIVE2D_MODEL)
     private val KEY_TELEGRAM_ENABLED = booleanPreferencesKey(SettingsKeys.TELEGRAM_ENABLED)
-    private val KEY_TELEGRAM_BOT_TOKEN = stringPreferencesKey(SettingsKeys.TELEGRAM_BOT_TOKEN)
-    private val KEY_TELEGRAM_CHAT_ID = stringPreferencesKey(SettingsKeys.TELEGRAM_CHAT_ID)
-    private val KEY_TELEGRAM_LAST_UPDATE_ID = longPreferencesKey(SettingsKeys.TELEGRAM_LAST_UPDATE_ID)
 
     // ── Flows (响应式订阅) ────────────────────────────
 
@@ -217,14 +213,6 @@ class SettingsManager(context: Context) {
         prefs[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
     }
 
-    val telegramBotTokenFlow: Flow<String> = dataStore.data.map { prefs ->
-        prefs[KEY_TELEGRAM_BOT_TOKEN] ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
-    }
-
-    val telegramChatIdFlow: Flow<String> = dataStore.data.map { prefs ->
-        prefs[KEY_TELEGRAM_CHAT_ID] ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
-    }
-
     // ── 同步 getter（非 Flow 场景使用，如 Client 构造）──
     // 读取内存快照，全程无磁盘 IO；快照未就绪时返回空快照，各 getter 落到 Defaults，
     // 绝不在主线程阻塞读盘（首帧真实值由对应 Flow 就绪后修正）
@@ -296,9 +284,6 @@ class SettingsManager(context: Context) {
     fun getAppLanguage(): String = currentPrefs()[KEY_APP_LANGUAGE] ?: SettingsKeys.Defaults.APP_LANGUAGE
     fun getActiveLive2dModel(): String = currentPrefs()[KEY_ACTIVE_LIVE2D_MODEL] ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
     fun isTelegramEnabled(): Boolean = currentPrefs()[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
-    fun getTelegramBotToken(): String = currentPrefs()[KEY_TELEGRAM_BOT_TOKEN] ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
-    fun getTelegramChatId(): String = currentPrefs()[KEY_TELEGRAM_CHAT_ID] ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
-    fun getTelegramLastUpdateId(): Long = currentPrefs()[KEY_TELEGRAM_LAST_UPDATE_ID] ?: SettingsKeys.Defaults.TELEGRAM_LAST_UPDATE_ID
 
     // ── 写入方法 ──────────────────────────────────────
     // edit 返回写入后的最新快照，随手更新缓存，保证同步 getter 读己之写
@@ -405,18 +390,6 @@ class SettingsManager(context: Context) {
 
     suspend fun setTelegramEnabled(enabled: Boolean) {
         cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_ENABLED] = enabled }
-    }
-
-    suspend fun setTelegramBotToken(token: String) {
-        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_BOT_TOKEN] = token }
-    }
-
-    suspend fun setTelegramChatId(chatId: String) {
-        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_CHAT_ID] = chatId }
-    }
-
-    suspend fun setTelegramLastUpdateId(updateId: Long) {
-        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_LAST_UPDATE_ID] = updateId }
     }
 
     /** 清除所有设置（恢复出厂）。 */

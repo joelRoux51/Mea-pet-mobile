@@ -18,6 +18,8 @@
     <string name="action_hide">Masquer</string>
     <string name="action_selected">Sélectionné</string>
     <string name="action_drag">Déplacer</string>
+    <string name="action_copy">Copier</string>
+    <string name="action_copied">Copié</string>
 
     <!-- Écran de chat & composants -->
     <string name="chat_empty_hint">Commencez à discuter avec Mea !\nEnvoyez un message pour démarrer</string>
@@ -30,7 +32,7 @@
     <string name="chat_cleared_conversation">%1$d messages effacés</string>
     <string name="chat_cleared_memories">%1$d souvenirs effacés</string>
     <string name="chat_api_empty_reply">La réponse de l\'API ne contient aucun texte valide</string>
-    <string name="chat_telegram_badge">Telegram</string>
+    <string name="chat_telegram_badge">Webhook</string>
     <string name="chat_dialogue_dismiss">Fermer</string>
 
     <!-- Menu supérieur -->
@@ -92,22 +94,16 @@
     <string name="provider_temperature_help_text">Détermine le caractère aléatoire des réponses. Plus la valeur est basse, plus les réponses sont stables et fidèles aux consignes ; plus elle est élevée, plus le style est varié et créatif.\n\nRecommandé : 0.8–1.2 pour discuter ; sous 0.3 pour des consignes strictes.\n\nNote : 0 ne garantit pas un résultat identique ; certains fournisseurs plafonnent à 1.0.</string>
     <string name="provider_max_tokens">Tokens max : %1$d</string>
 
-    <string name="telegram_section_title">Bot Telegram</string>
-    <string name="telegram_enable_label">Activer le Bot Telegram</string>
-    <string name="telegram_enable_desc">Recevoir des notifications push, une bulle sur le personnage et les messages dans le chat</string>
-    <string name="telegram_bot_token">Token du Bot</string>
-    <string name="telegram_bot_token_placeholder">123456:ABC-DEF…</string>
-    <string name="telegram_chat_id">ID de discussion (filtre optionnel)</string>
-    <string name="telegram_chat_id_placeholder">Laisser vide pour accepter tous les chats</string>
-    <string name="telegram_test_connection">Tester la connexion au bot</string>
-    <string name="telegram_testing">Connexion…</string>
-    <string name="telegram_connected_as">Connecté : @%1$s (%2$s)</string>
-    <string name="telegram_error_empty_token">Veuillez d\'abord saisir le Token du Bot Telegram</string>
-    <string name="telegram_error_unknown">Échec de la connexion à Telegram</string>
+    <string name="telegram_section_title">Serveur Webhook local</string>
+    <string name="telegram_enable_label">Activer le serveur Webhook</string>
+    <string name="telegram_enable_desc">Écouter sur le port 8081 (POST /notify) pour afficher une bulle sur le personnage, ajouter le message au chat et notifier</string>
+    <string name="webhook_server_url_label">Adresse IP locale du serveur</string>
+    <string name="webhook_endpoint_hint">Route : POST /notify · JSON : {"text": "…"}</string>
+    <string name="webhook_lan_urls_hint">IP réseau local (Wi-Fi) : %1$s (toucher pour copier)</string>
     <string name="telegram_notif_permission_btn">Autoriser les notifications</string>
-    <string name="telegram_notif_channel_name">Messages Telegram</string>
-    <string name="telegram_notif_channel_desc">Notifications push reçues depuis votre bot Telegram</string>
-    <string name="telegram_notif_default_sender">Bot Telegram</string>
+    <string name="telegram_notif_channel_name">Messages Webhook</string>
+    <string name="telegram_notif_channel_desc">Notifications reçues via le serveur Webhook local</string>
+    <string name="telegram_notif_default_sender">Alita</string>
 
     <!-- Paramètres discussion & mémoire -->
     <string name="chat_settings_system_prompt">Prompt système</string>

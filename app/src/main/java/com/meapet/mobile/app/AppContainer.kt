@@ -20,9 +20,8 @@ import com.meapet.mobile.memory.MemoryManager
 import com.meapet.mobile.memory.MemoryRepository
 import com.meapet.mobile.memory.MemoryService
 import com.meapet.mobile.settings.SettingsManager
-import com.meapet.mobile.telegram.TelegramBotClient
+import com.meapet.mobile.telegram.LocalWebhookServer
 import com.meapet.mobile.telegram.TelegramNotificationHelper
-import com.meapet.mobile.telegram.TelegramPoller
 import com.meapet.mobile.tts.TtsManager
 import com.meapet.mobile.tts.audio.TtsAudioPlayer
 import com.meapet.mobile.tts.engine.SherpaTtsEngine
@@ -156,22 +155,16 @@ class AppContainer(
         Live2dModelStore(context)
     }
 
-    /** Telegram Bot HTTP 客户端。 */
-    val telegramBotClient: TelegramBotClient by lazy {
-        TelegramBotClient()
-    }
-
-    /** Telegram 推送通知助手。 */
+    /** 推送通知助手。 */
     val telegramNotificationHelper: TelegramNotificationHelper by lazy {
         TelegramNotificationHelper(context)
     }
 
-    /** Telegram Bot 长轮询服务（收到消息写聊天记录、弹人物气泡、发通知）。 */
-    val telegramPoller: TelegramPoller by lazy {
-        TelegramPoller(
+    /** 本地 HTTP Webhook 服务器（默认端口 8081，接收 POST /notify 后写聊天记录、弹人物气泡、发通知）。 */
+    val localWebhookServer: LocalWebhookServer by lazy {
+        LocalWebhookServer(
             settingsManager = settingsManager,
             conversationManager = conversationManager,
-            botClient = telegramBotClient,
             notificationHelper = telegramNotificationHelper,
             scope = applicationScope
         )
@@ -270,7 +263,7 @@ class AppContainer(
                         manager.prewarmModel(context)
                     }.onFailure { Log.w(TAG, "Live2D 模型预热失败", it) }
                 },
-                launch { telegramPoller.start() }
+                launch { localWebhookServer.start() }
             ).joinAll()
         }
     }

@@ -59,11 +59,8 @@ object SettingsKeys {
     const val APP_LANGUAGE = "app_language"                  // "system" | "fr" | "en" | "es" | "zh"
     const val ACTIVE_LIVE2D_MODEL = "active_live2d_model"    // "" = built-in Mea, else model id
 
-    // ── Telegram Bot ──────────────────────────────────
+    // ── Local Webhook ─────────────────────────────────
     const val TELEGRAM_ENABLED = "telegram_enabled"
-    const val TELEGRAM_BOT_TOKEN = "telegram_bot_token"
-    const val TELEGRAM_CHAT_ID = "telegram_chat_id"
-    const val TELEGRAM_LAST_UPDATE_ID = "telegram_last_update_id"
 
     /** 合理的默认值。 */
     object Defaults {
@@ -103,10 +100,7 @@ object SettingsKeys {
         const val APP_LANGUAGE = "system"
         const val ACTIVE_LIVE2D_MODEL = ""
 
-        // Telegram Bot
+        // Local Webhook
         const val TELEGRAM_ENABLED = false
-        const val TELEGRAM_BOT_TOKEN = ""
-        const val TELEGRAM_CHAT_ID = ""
-        const val TELEGRAM_LAST_UPDATE_ID = 0L
     }
 }

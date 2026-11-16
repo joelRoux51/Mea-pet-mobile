@@ -25,7 +25,7 @@ import com.meapet.mobile.live2d.Live2dDelegate
 import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.memory.MemoryManager
 import com.meapet.mobile.memory.MemoryStats
-import com.meapet.mobile.telegram.TelegramPoller
+import com.meapet.mobile.telegram.LocalWebhookServer
 import com.meapet.mobile.update.UpdateCheckResult
 import com.meapet.mobile.update.UpdateChecker
 import kotlin.time.Duration.Companion.milliseconds
@@ -166,11 +166,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 监听 Telegram Bot 推送消息：追加到聊天流并在 Live2D 角色上方显示对话气泡
-        val poller: TelegramPoller? = container.telegramPoller
-        if (poller != null) {
+        // 监听本地 Webhook 推送消息：追加到聊天流并在 Live2D 角色上方显示对话气泡
+        val webhookServer: LocalWebhookServer? = container.localWebhookServer
+        if (webhookServer != null) {
             viewModelScope.launch {
-                poller.events.collect { event ->
+                webhookServer.events.collect { event ->
                     val bubble = CharacterBubbleUi(
                         id = event.message.id,
                         sender = event.sender,

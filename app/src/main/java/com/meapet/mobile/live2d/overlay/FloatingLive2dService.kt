@@ -152,11 +152,11 @@ class FloatingLive2dService : Service() {
             }
             createFloatingWindow()
             initOverlayWindows()
-            // 监听 Telegram Bot 推送消息，在悬浮窗人物旁弹出对话气泡
+            // 监听本地 Webhook 推送消息，在悬浮窗人物旁弹出对话气泡
             if (container != null) {
                 serviceScope.launch {
-                    container.telegramPoller.events.collect { event ->
-                        bubbleWindow?.addBubble("[Telegram · ${event.sender}]\n${event.text}")
+                    container.localWebhookServer.events.collect { event ->
+                        bubbleWindow?.addBubble("[${event.sender}]\n${event.text}")
                     }
                 }
             }

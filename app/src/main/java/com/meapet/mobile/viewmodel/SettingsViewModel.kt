@@ -22,7 +22,7 @@ import com.meapet.mobile.live2d.Live2dModelSpec
 import com.meapet.mobile.live2d.Live2dModelStore
 import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.settings.SettingsManager
-import com.meapet.mobile.telegram.TelegramBotClient
+import com.meapet.mobile.telegram.LocalWebhookServer
 import com.meapet.mobile.tts.model.TtsModelManager
 import com.meapet.mobile.tts.model.TtsModelState
 import com.meapet.mobile.update.UpdateCheckResult
@@ -96,13 +96,10 @@ data class SettingsUiState(
     val live2dImporting: Boolean = false,
     val live2dStatusMessage: String? = null,
     val live2dErrorMessage: String? = null,
-    // ── Telegram Bot ──
+    // ── Serveur Webhook local ──
     val telegramEnabled: Boolean = SettingsKeys.Defaults.TELEGRAM_ENABLED,
-    val telegramBotToken: String = SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN,
-    val telegramChatId: String = SettingsKeys.Defaults.TELEGRAM_CHAT_ID,
-    val telegramTesting: Boolean = false,
-    val telegramTestResult: String? = null,
-    val telegramTestError: String? = null,
+    val webhookServerUrl: String = LocalWebhookServer.defaultLocalUrl(),
+    val webhookLanUrls: List<String> = emptyList(),
     /** 刚执行、仍在撤销窗口内的破坏性操作（null = 无可撤销项）。 */
     val pendingUndo: SettingsUndo? = null
 )
@@ -164,8 +161,9 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
         val models = modelStore?.listModels() ?: listOf(Live2dModelStore.BUILT_IN_MODEL)
         val activeModelId = settingsManager.getActiveLive2dModel() ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
         val lang = settingsManager.getAppLanguage() ?: LocaleHelper.getLanguage(getApplication())
-        val tgToken = settingsManager.getTelegramBotToken() ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
-        val tgChatId = settingsManager.getTelegramChatId() ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
+        val serverUrls = LocalWebhookServer.resolveLocalServerUrls()
+        val primaryUrl = serverUrls.firstOrNull() ?: LocalWebhookServer.defaultLocalUrl()
+        val lanUrls = serverUrls.drop(1)
         return SettingsUiState(
             apiKey = key,
             apiKeyMasked = maskApiKey(key),
@@ -191,8 +189,8 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             activeLive2dModelId = activeModelId,
             live2dModels = models,
             telegramEnabled = settingsManager.isTelegramEnabled(),
-            telegramBotToken = tgToken,
-            telegramChatId = tgChatId
+            webhookServerUrl = primaryUrl,
+            webhookLanUrls = lanUrls
         )
     }
 
@@ -233,8 +231,6 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
         subscribe(settingsManager.appLanguageFlow) { s, lang -> s.copy(appLanguage = lang) }
         subscribe(settingsManager.activeLive2dModelFlow) { s, id -> s.copy(activeLive2dModelId = id) }
         subscribe(settingsManager.telegramEnabledFlow) { s, en -> s.copy(telegramEnabled = en) }
-        subscribe(settingsManager.telegramBotTokenFlow) { s, tok -> s.copy(telegramBotToken = tok) }
-        subscribe(settingsManager.telegramChatIdFlow) { s, cid -> s.copy(telegramChatId = cid) }
 
         // 隐私授权状态（响应式订阅：同意/撤销后 UI 即时反映）
         subscribe(privacyAgreedFlow()) { s, agreed ->
@@ -827,83 +823,24 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateTelegramEnabled(enabled: Boolean) {
-        viewModelScope.launch { settingsManager.setTelegramEnabled(enabled) }
-    }
-
-    fun saveTelegramBotToken(token: String) {
         viewModelScope.launch {
-            val trimmed = token.trim()
-            if (trimmed == settingsManager.getTelegramBotToken()) return@launch
-            settingsManager.setTelegramBotToken(trimmed)
+            settingsManager.setTelegramEnabled(enabled)
+            refreshWebhookUrls()
         }
     }
 
-    fun saveTelegramChatId(chatId: String) {
-        viewModelScope.launch {
-            val trimmed = chatId.trim()
-            if (trimmed == settingsManager.getTelegramChatId()) return@launch
-            settingsManager.setTelegramChatId(trimmed)
-        }
-    }
-
-    fun testTelegramConnection(token: String) {
-        val ctx = localizedCtx()
-        val trimmed = token.trim()
-        if (trimmed.isEmpty()) {
+    fun refreshWebhookUrls() {
+        viewModelScope.launch(ioDispatcher) {
+            val urls = LocalWebhookServer.resolveLocalServerUrls()
+            val primary = urls.firstOrNull() ?: LocalWebhookServer.defaultLocalUrl()
+            val lan = urls.drop(1)
             _state.update {
                 it.copy(
-                    telegramTestResult = null,
-                    telegramTestError = ctx.getStringOrFallback(
-                        R.string.telegram_error_empty_token,
-                        "Please enter a Telegram Bot Token first"
-                    )
+                    webhookServerUrl = primary,
+                    webhookLanUrls = lan
                 )
             }
-            return
         }
-        val client: TelegramBotClient = container.telegramBotClient ?: return
-        viewModelScope.launch {
-            _state.update {
-                it.copy(telegramTesting = true, telegramTestResult = null, telegramTestError = null)
-            }
-            if (trimmed != settingsManager.getTelegramBotToken()) {
-                settingsManager.setTelegramBotToken(trimmed)
-            }
-            val res = client.getMe(trimmed)
-            res.fold(
-                onSuccess = { info ->
-                    val label = info.username?.takeIf { u -> u.isNotBlank() } ?: info.firstName
-                    _state.update {
-                        it.copy(
-                            telegramTesting = false,
-                            telegramTestResult = ctx.getStringOrFallback(
-                                R.string.telegram_connected_as,
-                                "Connected: @%1\$s (%2\$s)",
-                                label,
-                                info.id.toString()
-                            ),
-                            telegramTestError = null
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    _state.update {
-                        it.copy(
-                            telegramTesting = false,
-                            telegramTestResult = null,
-                            telegramTestError = e.message?.takeIf { m -> m.isNotBlank() } ?: ctx.getStringOrFallback(
-                                R.string.telegram_error_unknown,
-                                "Telegram connection failed"
-                            )
-                        )
-                    }
-                }
-            )
-        }
-    }
-
-    fun dismissTelegramFeedback() {
-        _state.update { it.copy(telegramTestResult = null, telegramTestError = null) }
     }
 
     // ── 日志导出 ──────────────────────────────────────
