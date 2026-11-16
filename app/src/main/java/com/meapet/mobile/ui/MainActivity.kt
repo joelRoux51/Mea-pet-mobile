@@ -2,6 +2,7 @@ package com.meapet.mobile.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.ColorDrawable
@@ -24,16 +25,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.meapet.mobile.BuildConfig
+import com.meapet.mobile.R
+import com.meapet.mobile.core.LocaleHelper
 import com.meapet.mobile.core.PrivacyConsentManager
 import com.meapet.mobile.core.isDarkTheme
 import com.meapet.mobile.app.AppContainer
 import com.meapet.mobile.app.MeaPetApplication
 import com.meapet.mobile.live2d.Live2dDelegate
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dRenderState
 import com.meapet.mobile.live2d.Live2dRenderer
 import com.meapet.mobile.live2d.overlay.FloatingLive2dService
@@ -76,6 +81,10 @@ class MainActivity : ComponentActivity() {
     }
 
     // ── 生命周期 ──────────────────────────────────────
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
 
     @SuppressLint("ClickableViewAccessibility", "SourceLockedOrientationActivity")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -194,6 +203,18 @@ class MainActivity : ComponentActivity() {
                     Live2dDelegate.getInstance().wallpaperBlur = wallpaperBlur.toFloat()
                 }
 
+                // Live2D 模型切换：设置变化时通知 GL 线程重建模型
+                val activeModelId by container.settingsManager.activeLive2dModelFlow
+                    .collectAsState(initial = container.settingsManager.getActiveLive2dModel())
+                LaunchedEffect(activeModelId) {
+                    val spec = container.live2dModelStore.findById(activeModelId)
+                    if (Live2dManager.getInstance().setActiveModel(spec)) {
+                        glSurfaceView.queueEvent {
+                            Live2dManager.getInstance().resetModel()
+                        }
+                    }
+                }
+
                 // ── 隐私/更新弹窗 ──
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val scope = rememberCoroutineScope()
@@ -247,7 +268,7 @@ class MainActivity : ComponentActivity() {
                                 PrivacyConsentManager.setAgreed(context, false)
                                 closePrivacyDialog()
                             },
-                            subtitle = if (privacyIsUpdate) "隐私政策更新" else ""
+                            subtitle = if (privacyIsUpdate) stringResource(R.string.privacy_update_subtitle) else ""
                         )
                     }
                     // 等隐私弹窗关闭后再显示，避免首次启动两弹窗叠加

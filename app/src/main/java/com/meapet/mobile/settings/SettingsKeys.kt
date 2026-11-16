@@ -55,6 +55,16 @@ object SettingsKeys {
     const val TTS_OVERLAY_ENABLED = "tts_overlay_enabled"  // 悬浮窗语音开关
     const val TTS_LENGTH_SCALE = "tts_length_scale"        // 语速：0.5~2.0，1.0 为原速
 
+    // ── 语言与 Live2D 模型 ───────────────────────────
+    const val APP_LANGUAGE = "app_language"                  // "system" | "fr" | "en" | "es" | "zh"
+    const val ACTIVE_LIVE2D_MODEL = "active_live2d_model"    // "" = built-in Mea, else model id
+
+    // ── Telegram Bot ──────────────────────────────────
+    const val TELEGRAM_ENABLED = "telegram_enabled"
+    const val TELEGRAM_BOT_TOKEN = "telegram_bot_token"
+    const val TELEGRAM_CHAT_ID = "telegram_chat_id"
+    const val TELEGRAM_LAST_UPDATE_ID = "telegram_last_update_id"
+
     /** 合理的默认值。 */
     object Defaults {
         const val API_URL = "https://api.deepseek.com/v1"
@@ -88,5 +98,15 @@ object SettingsKeys {
         // 背景壁纸
         const val WALLPAPER_PATH = ""
         const val WALLPAPER_BLUR = 0.0
+
+        // 语言与 Live2D
+        const val APP_LANGUAGE = "system"
+        const val ACTIVE_LIVE2D_MODEL = ""
+
+        // Telegram Bot
+        const val TELEGRAM_ENABLED = false
+        const val TELEGRAM_BOT_TOKEN = ""
+        const val TELEGRAM_CHAT_ID = ""
+        const val TELEGRAM_LAST_UPDATE_ID = 0L
     }
 }

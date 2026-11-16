@@ -84,9 +84,17 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         motionUpdated = false
         m.loadParameters()
 
-        // Auto-start idle motion if nothing is playing
+        // Auto-start idle motion if nothing is playing and an idle group has motions
         if (motionManager.isFinished()) {
-            startMotion(Live2dDefine.MotionGroup.IDLE, 0, Live2dDefine.Priority.IDLE)
+            val ms = modelSetting
+            if (ms != null) {
+                when {
+                    ms.getMotionCount(Live2dDefine.MotionGroup.IDLE) > 0 ->
+                        startMotion(Live2dDefine.MotionGroup.IDLE, 0, Live2dDefine.Priority.IDLE)
+                    ms.getMotionCount("idle") > 0 ->
+                        startMotion("idle", 0, Live2dDefine.Priority.IDLE)
+                }
+            }
         } else {
             motionUpdated = motionManager.updateMotion(m, deltaTimeSeconds)
         }
@@ -103,6 +111,9 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
     }
 
     fun startMotion(group: String, number: Int, priority: Int): Int {
+        val modelSetting = modelSetting ?: return -1
+        if (number < 0 || number >= modelSetting.getMotionCount(group)) return -1
+
         if (priority == Live2dDefine.Priority.FORCE) {
             motionManager.setReservationPriority(priority)
         } else if (!motionManager.reserveMotion(priority)) {
@@ -112,16 +123,15 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
             return -1
         }
 
-        val modelSetting = modelSetting ?: return -1
         val fileName = modelSetting.getMotionFileName(group, number)
         val name = "${group}_$number"
 
         var motion = motions[name] as? CubismMotion
 
         if (motion == null && fileName.isNotEmpty()) {
-            val path = modelHomeDirectory + fileName
+            val path = joinModelPath(fileName)
             val buffer = Live2dPal.loadFileAsBytes(path)
-            val tmp = loadMotion(buffer) as? CubismMotion
+            val tmp = if (buffer.isNotEmpty()) loadMotion(buffer) as? CubismMotion else null
             if (tmp != null) {
                 motion = tmp
                 val fadeIn = modelSetting.getMotionFadeInTimeValue(group, number)
@@ -130,6 +140,8 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
                 if (fadeOut != -1.0f) motion.fadeOutTime = fadeOut
             }
         }
+
+        if (motion == null) return -1
 
         if (Live2dDefine.DEBUG_LOG_ENABLE) {
             CubismFramework.coreLogFunction("[APP] start motion: ${group}_$number")
@@ -195,7 +207,7 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         for (i in 0 until ms.textureCount) {
             val texName = ms.getTextureFileName(i)
             if (texName.isEmpty()) continue
-            val texPath = modelHomeDirectory + texName
+            val texPath = joinModelPath(texName)
             val texInfo = tm.createTextureFromPngFile(texPath) ?: continue
             castRenderer<CubismRendererAndroid>().bindTexture(i, texInfo.id)
             castRenderer<CubismRendererAndroid>().isPremultipliedAlpha(Live2dDefine.PREMULTIPLIED_ALPHA_ENABLE)
@@ -204,11 +216,17 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
 
     // ---- private helpers ----
 
+    private fun joinModelPath(relative: String): String {
+        val cleanRel = relative.removePrefix("./").removePrefix("/")
+        return modelHomeDirectory.trimEnd('/') + "/" + cleanRel
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T : CubismRenderer> castRenderer(): T = getRenderer() as T
 
     private fun setupModel(model3JsonPath: String): Boolean {
         val model3Json = Live2dPal.loadFileAsBytes(model3JsonPath)
+        if (model3Json.isEmpty()) return false
         modelSetting = CubismModelSettingJson(model3Json)
 
         if (modelSetting?.json == null) {
@@ -225,10 +243,12 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         val ms = modelSetting ?: return false
 
         // Load .moc3
-        val mocPath = modelHomeDirectory + ms.modelFileName
-        if (mocPath.isNotEmpty()) {
-            val buffer = Live2dPal.loadFileAsBytes(mocPath)
-            loadModel(buffer, mocConsistency)
+        val mocName = ms.modelFileName
+        if (mocName.isNotEmpty()) {
+            val buffer = Live2dPal.loadFileAsBytes(joinModelPath(mocName))
+            if (buffer.isNotEmpty()) {
+                loadModel(buffer, mocConsistency)
+            }
         }
 
         // Expressions
@@ -236,9 +256,12 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         if (expCount > 0) {
             for (i in 0 until expCount) {
                 val name = ms.getExpressionName(i)
-                val path = modelHomeDirectory + ms.getExpressionFileName(i)
-                val buffer = Live2dPal.loadFileAsBytes(path)
-                loadExpression(buffer)?.let { expressions[name] = it }
+                val expFile = ms.getExpressionFileName(i)
+                if (expFile.isEmpty()) continue
+                val buffer = Live2dPal.loadFileAsBytes(joinModelPath(expFile))
+                if (buffer.isNotEmpty()) {
+                    loadExpression(buffer)?.let { expressions[name] = it }
+                }
             }
             updateScheduler.addUpdatableList(CubismExpressionUpdater(expressionManager))
         }
@@ -246,8 +269,8 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         // Pose
         val posePath = ms.poseFileName
         if (posePath.isNotEmpty()) {
-            val buffer = Live2dPal.loadFileAsBytes(modelHomeDirectory + posePath)
-            loadPose(buffer)
+            val buffer = Live2dPal.loadFileAsBytes(joinModelPath(posePath))
+            if (buffer.isNotEmpty()) loadPose(buffer)
         }
         if (pose != null) {
             updateScheduler.addUpdatableList(CubismPoseUpdater(pose))
@@ -256,8 +279,8 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         // Physics
         val physicsPath = ms.physicsFileName
         if (physicsPath.isNotEmpty()) {
-            val buffer = Live2dPal.loadFileAsBytes(modelHomeDirectory + physicsPath)
-            loadPhysics(buffer)
+            val buffer = Live2dPal.loadFileAsBytes(joinModelPath(physicsPath))
+            if (buffer.isNotEmpty()) loadPhysics(buffer)
         }
         if (physics != null) {
             updateScheduler.addUpdatableList(CubismPhysicsUpdater(physics))
@@ -266,8 +289,8 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         // UserData
         val userDataPath = ms.userDataFile
         if (userDataPath.isNotEmpty()) {
-            val buffer = Live2dPal.loadFileAsBytes(modelHomeDirectory + userDataPath)
-            loadUserData(buffer)
+            val buffer = Live2dPal.loadFileAsBytes(joinModelPath(userDataPath))
+            if (buffer.isNotEmpty()) loadUserData(buffer)
         }
 
         // Look (eye tracking by drag)
@@ -312,8 +335,9 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
             val path = ms.getMotionFileName(group, i)
             if (path.isEmpty()) continue
 
-            val fullPath = modelHomeDirectory + path
+            val fullPath = joinModelPath(path)
             val buffer = Live2dPal.loadFileAsBytes(fullPath)
+            if (buffer.isEmpty()) continue
             val tmp = loadMotion(buffer) as? CubismMotion ?: continue
 
             val fadeIn = ms.getMotionFadeInTimeValue(group, i)
@@ -332,7 +356,7 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
             val texName = modelSetting.getTextureFileName(i)
             if (texName.isEmpty()) continue
 
-            val texPath = modelHomeDirectory + texName
+            val texPath = joinModelPath(texName)
             val texInfo = Live2dDelegate.getInstance()
                 .textureManager
                 .createTextureFromPngFile(texPath) ?: continue

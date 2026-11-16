@@ -8,7 +8,9 @@ import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.meapet.mobile.core.LocaleHelper
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +38,8 @@ import kotlinx.coroutines.launch
  */
 class SettingsManager(context: Context) {
 
-    private val dataStore = context.appDataStore
+    private val appContext = context.applicationContext
+    private val dataStore = appContext.appDataStore
 
     /** 设置项内存快照（跟随 DataStore 变更；null = 尚未完成首次加载）。 */
     @Volatile
@@ -88,6 +91,12 @@ class SettingsManager(context: Context) {
     private val KEY_WALLPAPER_PATH = stringPreferencesKey(SettingsKeys.WALLPAPER_PATH)
     private val KEY_WALLPAPER_BLUR = doublePreferencesKey(SettingsKeys.WALLPAPER_BLUR)
     private val KEY_PRIVACY_VERSION_SHOWN = stringPreferencesKey(SettingsKeys.PRIVACY_VERSION_SHOWN)
+    private val KEY_APP_LANGUAGE = stringPreferencesKey(SettingsKeys.APP_LANGUAGE)
+    private val KEY_ACTIVE_LIVE2D_MODEL = stringPreferencesKey(SettingsKeys.ACTIVE_LIVE2D_MODEL)
+    private val KEY_TELEGRAM_ENABLED = booleanPreferencesKey(SettingsKeys.TELEGRAM_ENABLED)
+    private val KEY_TELEGRAM_BOT_TOKEN = stringPreferencesKey(SettingsKeys.TELEGRAM_BOT_TOKEN)
+    private val KEY_TELEGRAM_CHAT_ID = stringPreferencesKey(SettingsKeys.TELEGRAM_CHAT_ID)
+    private val KEY_TELEGRAM_LAST_UPDATE_ID = longPreferencesKey(SettingsKeys.TELEGRAM_LAST_UPDATE_ID)
 
     // ── Flows (响应式订阅) ────────────────────────────
 
@@ -196,6 +205,26 @@ class SettingsManager(context: Context) {
         prefs[KEY_PRIVACY_VERSION_SHOWN] ?: SettingsKeys.Defaults.PRIVACY_VERSION_SHOWN
     }
 
+    val appLanguageFlow: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_APP_LANGUAGE] ?: SettingsKeys.Defaults.APP_LANGUAGE
+    }
+
+    val activeLive2dModelFlow: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_ACTIVE_LIVE2D_MODEL] ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
+    }
+
+    val telegramEnabledFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
+    }
+
+    val telegramBotTokenFlow: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_TELEGRAM_BOT_TOKEN] ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
+    }
+
+    val telegramChatIdFlow: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_TELEGRAM_CHAT_ID] ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
+    }
+
     // ── 同步 getter（非 Flow 场景使用，如 Client 构造）──
     // 读取内存快照，全程无磁盘 IO；快照未就绪时返回空快照，各 getter 落到 Defaults，
     // 绝不在主线程阻塞读盘（首帧真实值由对应 Flow 就绪后修正）
@@ -263,6 +292,13 @@ class SettingsManager(context: Context) {
 
     /** 是否首次启动（同步读取；默认 true）。 */
     fun isFirstLaunch(): Boolean = currentPrefs()[KEY_FIRST_LAUNCH] ?: true
+
+    fun getAppLanguage(): String = currentPrefs()[KEY_APP_LANGUAGE] ?: SettingsKeys.Defaults.APP_LANGUAGE
+    fun getActiveLive2dModel(): String = currentPrefs()[KEY_ACTIVE_LIVE2D_MODEL] ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
+    fun isTelegramEnabled(): Boolean = currentPrefs()[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
+    fun getTelegramBotToken(): String = currentPrefs()[KEY_TELEGRAM_BOT_TOKEN] ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
+    fun getTelegramChatId(): String = currentPrefs()[KEY_TELEGRAM_CHAT_ID] ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
+    fun getTelegramLastUpdateId(): Long = currentPrefs()[KEY_TELEGRAM_LAST_UPDATE_ID] ?: SettingsKeys.Defaults.TELEGRAM_LAST_UPDATE_ID
 
     // ── 写入方法 ──────────────────────────────────────
     // edit 返回写入后的最新快照，随手更新缓存，保证同步 getter 读己之写
@@ -356,6 +392,31 @@ class SettingsManager(context: Context) {
 
     suspend fun setWallpaperBlur(blur: Double) {
         cachedPrefs = dataStore.edit { prefs -> prefs[KEY_WALLPAPER_BLUR] = blur }
+    }
+
+    suspend fun setAppLanguage(language: String) {
+        LocaleHelper.setLanguage(appContext, language)
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_APP_LANGUAGE] = language }
+    }
+
+    suspend fun setActiveLive2dModel(modelId: String) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_ACTIVE_LIVE2D_MODEL] = modelId }
+    }
+
+    suspend fun setTelegramEnabled(enabled: Boolean) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_ENABLED] = enabled }
+    }
+
+    suspend fun setTelegramBotToken(token: String) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_BOT_TOKEN] = token }
+    }
+
+    suspend fun setTelegramChatId(chatId: String) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_CHAT_ID] = chatId }
+    }
+
+    suspend fun setTelegramLastUpdateId(updateId: Long) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_LAST_UPDATE_ID] = updateId }
     }
 
     /** 清除所有设置（恢复出厂）。 */

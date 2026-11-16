@@ -14,10 +14,15 @@ import com.meapet.mobile.core.AppInfo
 import com.meapet.mobile.core.LifecycleManager
 import com.meapet.mobile.core.WallpaperStore
 import com.meapet.mobile.legacy.LegacyMigration
+import com.meapet.mobile.live2d.Live2dManager
+import com.meapet.mobile.live2d.Live2dModelStore
 import com.meapet.mobile.memory.MemoryManager
 import com.meapet.mobile.memory.MemoryRepository
 import com.meapet.mobile.memory.MemoryService
 import com.meapet.mobile.settings.SettingsManager
+import com.meapet.mobile.telegram.TelegramBotClient
+import com.meapet.mobile.telegram.TelegramNotificationHelper
+import com.meapet.mobile.telegram.TelegramPoller
 import com.meapet.mobile.tts.TtsManager
 import com.meapet.mobile.tts.audio.TtsAudioPlayer
 import com.meapet.mobile.tts.engine.SherpaTtsEngine
@@ -146,6 +151,32 @@ class AppContainer(
         WallpaperStore(context)
     }
 
+    /** Live2D 模型包存储与外部 .zip 导入。 */
+    val live2dModelStore: Live2dModelStore by lazy {
+        Live2dModelStore(context)
+    }
+
+    /** Telegram Bot HTTP 客户端。 */
+    val telegramBotClient: TelegramBotClient by lazy {
+        TelegramBotClient()
+    }
+
+    /** Telegram 推送通知助手。 */
+    val telegramNotificationHelper: TelegramNotificationHelper by lazy {
+        TelegramNotificationHelper(context)
+    }
+
+    /** Telegram Bot 长轮询服务（收到消息写聊天记录、弹人物气泡、发通知）。 */
+    val telegramPoller: TelegramPoller by lazy {
+        TelegramPoller(
+            settingsManager = settingsManager,
+            conversationManager = conversationManager,
+            botClient = telegramBotClient,
+            notificationHelper = telegramNotificationHelper,
+            scope = applicationScope
+        )
+    }
+
     /** 生命周期管理器。 */
     val lifecycleManager: LifecycleManager by lazy {
         LifecycleManager(
@@ -229,15 +260,17 @@ class AppContainer(
                 launch { conversationManager.restore(conversationStore.load()) },
                 // 版本迁移：启动时异步执行（框架长期保留；当前 TTS step 预计 1.9.0 移除，见 docs/legacy-compat.md）
                 launch { LegacyMigration.run(context, settingsManager, ttsModelManager) },
-                // Live2D 模型文件预读到内存缓存：模型加载在 GL 线程同步执行，
-                // asset 读取是最大耗时（阻塞主线程 onPause 数秒）。预热后 GL 线程
-                // 只做解析 + GL 上传，启动/切前后台不再长时间卡顿。
+                // Live2D 模型文件预读到内存缓存：先读取持久化选中的模型再预热。
                 launch {
                     runCatching {
-                        com.meapet.mobile.live2d.Live2dManager.getInstance()
-                            .prewarmModel(context)
+                        settingsManager.awaitLoaded()
+                        val selectedSpec = live2dModelStore.findById(settingsManager.getActiveLive2dModel())
+                        val manager = Live2dManager.getInstance()
+                        manager.setActiveModel(selectedSpec)
+                        manager.prewarmModel(context)
                     }.onFailure { Log.w(TAG, "Live2D 模型预热失败", it) }
-                }
+                },
+                launch { telegramPoller.start() }
             ).joinAll()
         }
     }

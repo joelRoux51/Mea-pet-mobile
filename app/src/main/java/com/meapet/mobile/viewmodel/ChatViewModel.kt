@@ -1,23 +1,31 @@
 package com.meapet.mobile.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.meapet.mobile.R
+import com.meapet.mobile.app.MeaPetApplication
+import com.meapet.mobile.chat.CharacterBubbleUi
 import com.meapet.mobile.chat.ChatMessage
 import com.meapet.mobile.chat.ChatRole
 import com.meapet.mobile.chat.ChatService
 import com.meapet.mobile.chat.ChatUiState
 import com.meapet.mobile.chat.ChatUndo
-import com.meapet.mobile.chat.SystemBubblePolicy
+import com.meapet.mobile.chat.EmptyReplyException
 import com.meapet.mobile.chat.MemoryDialogUi
+import com.meapet.mobile.chat.SystemBubblePolicy
 import com.meapet.mobile.chat.UpdateNoticeUi
-import com.meapet.mobile.app.MeaPetApplication
+import com.meapet.mobile.client.exception.ApiException
+import com.meapet.mobile.core.LocaleHelper
+import com.meapet.mobile.core.getStringOrFallback
 import com.meapet.mobile.core.undoWindowMs
 import com.meapet.mobile.live2d.Live2dDelegate
 import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.memory.MemoryManager
 import com.meapet.mobile.memory.MemoryStats
+import com.meapet.mobile.telegram.TelegramPoller
 import com.meapet.mobile.update.UpdateCheckResult
 import com.meapet.mobile.update.UpdateChecker
 import kotlin.time.Duration.Companion.milliseconds
@@ -75,8 +83,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /** 快照唯一标识递增源：同一操作连续触发时让 UI 的撤销条重新弹出。 */
     private var undoSeq = 0L
 
+    /** 角色上方对话气泡的自动消失定时任务。 */
+    private var characterBubbleJob: Job? = null
+
     /** 本机撤销窗口时长（无障碍开启时由系统建议值延长）。 */
     private val undoWindow: Long by lazy { undoWindowMs(getApplication()) }
+
+    private fun localizedCtx(): Context = LocaleHelper.wrap(getApplication())
+
+    companion object {
+        private const val CHARACTER_BUBBLE_TIMEOUT_MS = 10_000L
+    }
 
     init {
         // 初始化时从 ConversationManager 加载已有消息
@@ -149,16 +166,58 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        // 监听 Telegram Bot 推送消息：追加到聊天流并在 Live2D 角色上方显示对话气泡
+        val poller: TelegramPoller? = container.telegramPoller
+        if (poller != null) {
+            viewModelScope.launch {
+                poller.events.collect { event ->
+                    val bubble = CharacterBubbleUi(
+                        id = event.message.id,
+                        sender = event.sender,
+                        text = event.text,
+                        isTelegram = true
+                    )
+                    _state.update { current ->
+                        val updatedMessages = if (current.messages.any { it.id == event.message.id }) {
+                            current.messages
+                        } else {
+                            current.messages + event.message
+                        }
+                        current.copy(
+                            messages = updatedMessages,
+                            characterBubble = bubble
+                        )
+                    }
+                    characterBubbleJob?.cancel()
+                    characterBubbleJob = viewModelScope.launch {
+                        delay(CHARACTER_BUBBLE_TIMEOUT_MS)
+                        _state.update { current ->
+                            if (current.characterBubble?.id == bubble.id) {
+                                current.copy(characterBubble = null)
+                            } else {
+                                current
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // 启动时静默检测一次：仅在有新版本时提示，失败不打扰。
         // 受设置页「启动自动检查更新」开关控制（默认开启）。
         if (container.settingsManager.isAutoUpdateCheckEnabled()) {
             viewModelScope.launch {
                 when (val result = updateChecker.check()) {
                     is UpdateCheckResult.UpdateAvailable -> {
+                        val ctx = localizedCtx()
                         _state.update {
                             it.copy(
                                 updateNotice = UpdateNoticeUi(
-                                    message = "发现新版本 v${result.release.versionName}",
+                                    message = ctx.getStringOrFallback(
+                                        R.string.update_available_notice,
+                                        "New version available: v%1\$s",
+                                        result.release.versionName
+                                    ),
                                     url = result.release.htmlUrl
                                 )
                             )
@@ -253,6 +312,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ChatEvent.RetryLastMessage -> retryLastMessage()
             is ChatEvent.DismissError -> dismissError()
             is ChatEvent.DismissUpdateNotice -> dismissUpdateNotice()
+            is ChatEvent.DismissCharacterBubble -> dismissCharacterBubble()
         }
     }
 
@@ -293,10 +353,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     container.ttsManager.speak(assistantMsg, com.meapet.mobile.tts.TtsManager.Source.MAIN)
                 },
                 onFailure = { error ->
+                    val ctx = localizedCtx()
+                    val errMsg = when (error) {
+                        is EmptyReplyException -> ctx.getStringOrFallback(
+                            R.string.chat_api_empty_reply,
+                            "API response did not contain valid reply content"
+                        )
+                        is ApiException -> error.localizedMessage(ctx)
+                        else -> error.message ?: ctx.getStringOrFallback(
+                            R.string.chat_send_failed_default,
+                            "Failed to send. Check your network and API Key."
+                        )
+                    }
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = error.message ?: "发送失败，请检查网络和 API Key"
+                            error = errMsg
                         )
                     }
                 }
@@ -346,10 +418,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 },
                 onFailure = { error ->
+                    val ctx = localizedCtx()
+                    val errMsg = when (error) {
+                        is EmptyReplyException -> ctx.getStringOrFallback(
+                            R.string.chat_api_empty_reply,
+                            "API response did not contain valid reply content"
+                        )
+                        is ApiException -> error.localizedMessage(ctx)
+                        else -> error.message ?: ctx.getStringOrFallback(
+                            R.string.chat_retry_failed_default,
+                            "Retry failed"
+                        )
+                    }
                     _state.update {
                         it.copy(
                             isLoading = false,
-                            error = error.message ?: "重试失败"
+                            error = errMsg
                         )
                     }
                 }
@@ -378,11 +462,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         if (snapshot.isNotEmpty()) {
+            val ctx = localizedCtx()
             beginUndo(
                 ChatUndo.ClearConversation(
                     id = nextUndoId(),
                     deadlineMs = nextUndoDeadline(),
-                    snapshot = snapshot
+                    snapshot = snapshot,
+                    message = ctx.getStringOrFallback(
+                        R.string.chat_cleared_conversation,
+                        "Cleared %1\$d messages",
+                        snapshot.size
+                    ),
+                    undoLabel = ctx.getStringOrFallback(R.string.action_undo, "Undo")
                 )
             )
         }
@@ -404,12 +495,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             if (snapshot.isNotEmpty()) {
+                val ctx = localizedCtx()
                 beginUndo(
                     ChatUndo.ClearMemory(
                         id = nextUndoId(),
                         deadlineMs = nextUndoDeadline(),
                         snapshot = snapshot,
-                        exchangeCount = exchangeCount
+                        exchangeCount = exchangeCount,
+                        message = ctx.getStringOrFallback(
+                            R.string.chat_cleared_memories,
+                            "Cleared %1\$d memories",
+                            snapshot.size
+                        ),
+                        undoLabel = ctx.getStringOrFallback(R.string.action_undo, "Undo")
                     )
                 )
             }
@@ -523,6 +621,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun dismissUpdateNotice() {
         _state.update { it.copy(updateNotice = null) }
+    }
+
+    private fun dismissCharacterBubble() {
+        characterBubbleJob?.cancel()
+        characterBubbleJob = null
+        _state.update { it.copy(characterBubble = null) }
     }
 
     /**

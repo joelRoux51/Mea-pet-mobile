@@ -33,4 +33,8 @@ sealed interface ChatEvent {
 
     /** 启动静默检测更新提示已展示。 */
     data object DismissUpdateNotice : ChatEvent
+
+    /** 关闭角色头顶对话气泡。 */
+    data object DismissCharacterBubble : ChatEvent
 }
+

@@ -1,10 +1,12 @@
 package com.meapet.mobile.ui.theme
 
+import androidx.annotation.StringRes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import com.meapet.mobile.R
 
 // ── 调色工具 ──────────────────────────
 
@@ -130,23 +132,26 @@ val Pink40 = S_Default.desaturate(0.6f)
 
 @Immutable
 data class ThemePreset(
-    val id: String, val name: String, val seed: Color,
-    val light: ColorScheme, val dark: ColorScheme,
+    val id: String,
+    @StringRes val nameRes: Int,
+    val seed: Color,
+    val light: ColorScheme,
+    val dark: ColorScheme,
 )
 
 val THEME_PRESETS: List<ThemePreset> = listOf(
-    ThemePreset("default",    "紫罗兰", S_Default,    lightScheme(S_Default),    darkScheme(S_Default)),
-    ThemePreset("ocean",      "海洋",   S_Ocean,      lightScheme(S_Ocean, Color(0xFFF8FDFF)), darkScheme(S_Ocean, Color(0xFF1A1C1E))),
-    ThemePreset("forest",     "森林",   S_Forest,     lightScheme(S_Forest, Color(0xFFF8FDF5)), darkScheme(S_Forest, Color(0xFF1B1F19))),
-    ThemePreset("sunset",     "日落",   S_Sunset,     lightScheme(S_Sunset, Color(0xFFFFF8F4)), darkScheme(S_Sunset, Color(0xFF201A16))),
-    ThemePreset("rose",       "玫瑰",   S_Rose,       lightScheme(S_Rose, Color(0xFFFFF8F9)),   darkScheme(S_Rose, Color(0xFF201A1C))),
-    ThemePreset("mono",       "单色",   S_Mono,       lightScheme(S_Mono),                       darkScheme(S_Mono)),
-    ThemePreset("sky",        "晴空",   S_Sky,        lightScheme(S_Sky, Color(0xFFF5FAFC)),     darkScheme(S_Sky, Color(0xFF1A2228))),
-    ThemePreset("sage",       "鼠尾草", S_Sage,       lightScheme(S_Sage, Color(0xFFF5FAF6)),    darkScheme(S_Sage, Color(0xFF18201A))),
-    ThemePreset("lilac",      "丁香",   S_Lilac,      lightScheme(S_Lilac, Color(0xFFFAF8FC)),   darkScheme(S_Lilac, Color(0xFF1E1A24))),
-    ThemePreset("terracotta", "陶土",   S_Terracotta, lightScheme(S_Terracotta, Color(0xFFFCF8F6)), darkScheme(S_Terracotta, Color(0xFF241C18))),
-    ThemePreset("amber",      "琥珀",   S_Amber,      lightScheme(S_Amber, Color(0xFFFCFAF2)),   darkScheme(S_Amber, Color(0xFF222016))),
-    ThemePreset("steel",      "钢蓝",   S_Steel,      lightScheme(S_Steel, Color(0xFFF4F6F8)),   darkScheme(S_Steel, Color(0xFF161A20))),
+    ThemePreset("default",    R.string.preset_default,    S_Default,    lightScheme(S_Default),    darkScheme(S_Default)),
+    ThemePreset("ocean",      R.string.preset_ocean,      S_Ocean,      lightScheme(S_Ocean, Color(0xFFF8FDFF)), darkScheme(S_Ocean, Color(0xFF1A1C1E))),
+    ThemePreset("forest",     R.string.preset_forest,     S_Forest,     lightScheme(S_Forest, Color(0xFFF8FDF5)), darkScheme(S_Forest, Color(0xFF1B1F19))),
+    ThemePreset("sunset",     R.string.preset_sunset,     S_Sunset,     lightScheme(S_Sunset, Color(0xFFFFF8F4)), darkScheme(S_Sunset, Color(0xFF201A16))),
+    ThemePreset("rose",       R.string.preset_rose,       S_Rose,       lightScheme(S_Rose, Color(0xFFFFF8F9)),   darkScheme(S_Rose, Color(0xFF201A1C))),
+    ThemePreset("mono",       R.string.preset_mono,       S_Mono,       lightScheme(S_Mono),                       darkScheme(S_Mono)),
+    ThemePreset("sky",        R.string.preset_sky,        S_Sky,        lightScheme(S_Sky, Color(0xFFF5FAFC)),     darkScheme(S_Sky, Color(0xFF1A2228))),
+    ThemePreset("sage",       R.string.preset_sage,       S_Sage,       lightScheme(S_Sage, Color(0xFFF5FAF6)),    darkScheme(S_Sage, Color(0xFF18201A))),
+    ThemePreset("lilac",      R.string.preset_lilac,      S_Lilac,      lightScheme(S_Lilac, Color(0xFFFAF8FC)),   darkScheme(S_Lilac, Color(0xFF1E1A24))),
+    ThemePreset("terracotta", R.string.preset_terracotta, S_Terracotta, lightScheme(S_Terracotta, Color(0xFFFCF8F6)), darkScheme(S_Terracotta, Color(0xFF241C18))),
+    ThemePreset("amber",      R.string.preset_amber,      S_Amber,      lightScheme(S_Amber, Color(0xFFFCFAF2)),   darkScheme(S_Amber, Color(0xFF222016))),
+    ThemePreset("steel",      R.string.preset_steel,      S_Steel,      lightScheme(S_Steel, Color(0xFFF4F6F8)),   darkScheme(S_Steel, Color(0xFF161A20))),
 )
 
 fun findPreset(id: String): ThemePreset =

@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MeaPet</string>
+
+    <!-- Actions communes -->
+    <string name="action_back">Retour</string>
+    <string name="action_close">Fermer</string>
+    <string name="action_send">Envoyer</string>
+    <string name="action_retry">Réessayer</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="action_clear_all">Tout effacer</string>
+    <string name="action_undo">Annuler</string>
+    <string name="action_got_it">Compris</string>
+    <string name="action_view">Voir</string>
+    <string name="action_restore_default">Par défaut</string>
+    <string name="action_show">Afficher</string>
+    <string name="action_hide">Masquer</string>
+    <string name="action_selected">Sélectionné</string>
+    <string name="action_drag">Déplacer</string>
+
+    <!-- Écran de chat & composants -->
+    <string name="chat_empty_hint">Commencez à discuter avec Mea !\nEnvoyez un message pour démarrer</string>
+    <string name="chat_thinking">Mea réfléchit…</string>
+    <string name="chat_input_placeholder">Envoyer un message à Mea…</string>
+    <string name="chat_streaming_typing">Saisie en cours…</string>
+    <string name="chat_send_failed_title">Échec de l\'envoi</string>
+    <string name="chat_send_failed_default">Échec de l\'envoi. Vérifiez le réseau et la clé API.</string>
+    <string name="chat_retry_failed_default">Échec de la nouvelle tentative</string>
+    <string name="chat_cleared_conversation">%1$d messages effacés</string>
+    <string name="chat_cleared_memories">%1$d souvenirs effacés</string>
+    <string name="chat_api_empty_reply">La réponse de l\'API ne contient aucun texte valide</string>
+    <string name="chat_telegram_badge">Telegram</string>
+    <string name="chat_dialogue_dismiss">Fermer</string>
+
+    <!-- Menu supérieur -->
+    <string name="menu_more_options">Plus d\'options</string>
+    <string name="menu_settings">Paramètres</string>
+    <string name="menu_clear_conversation">Effacer la discussion</string>
+    <string name="menu_view_memories">Voir les souvenirs</string>
+    <string name="menu_overlay">Fenêtre flottante</string>
+    <string name="tts_unmute_session">Activer la voix pour cette session</string>
+    <string name="tts_mute_session">Couper la voix pour cette session</string>
+
+    <!-- Fenêtre des souvenirs -->
+    <string name="memory_dialog_title">Souvenirs de Mea</string>
+    <string name="memory_stats_summary">Total %1$d · Court terme %2$d · Long terme %3$d · Faits %4$d</string>
+    <string name="memory_disabled_hint">La mémoire est désactivée (activable dans les Paramètres)</string>
+    <string name="memory_empty_hint">Aucun souvenir pour le moment~\nDiscutez davantage avec Mea !</string>
+    <string name="memory_importance">Importance %1$d%%</string>
+    <string name="memory_keywords">Mots-clés : %1$s</string>
+    <string name="memory_type_short_term">Court terme</string>
+    <string name="memory_type_long_term">Long terme</string>
+    <string name="memory_type_core_trait">Trait clé</string>
+    <string name="memory_type_factual">Fait</string>
+
+    <!-- Navigation & résumés des paramètres -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_provider">Fournisseur</string>
+    <string name="settings_chat">Discussion</string>
+    <string name="settings_appearance">Apparence</string>
+    <string name="settings_voice">Voix</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_privacy_policy">Politique de confidentialité</string>
+    <string name="settings_summary_no_model">Modèle non configuré</string>
+    <string name="settings_summary_chat_on">Prompt système · Mémoire activée</string>
+    <string name="settings_summary_chat_off">Prompt système · Mémoire désactivée</string>
+    <string name="settings_summary_voice_on">Synthèse vocale activée</string>
+    <string name="settings_summary_voice_off">Synthèse vocale désactivée</string>
+    <string name="settings_summary_about_default">Infos de version, confidentialité</string>
+    <string name="settings_summary_about_version">Version %1$s</string>
+    <string name="settings_summary_dynamic_color">Couleurs dynamiques</string>
+    <string name="settings_help_suffix">Aide %1$s</string>
+    <string name="settings_undo_prompt_reset">Prompt système réinitialisé par défaut</string>
+    <string name="settings_undo_wallpaper_removed">Fond d\'écran supprimé</string>
+
+    <!-- Fournisseur & Bot Telegram -->
+    <string name="provider_api_config">Configuration API</string>
+    <string name="provider_api_hint">Nécessite un point d\'accès compatible OpenAI</string>
+    <string name="provider_api_key">Clé API</string>
+    <string name="provider_api_url">URL de l\'API</string>
+    <string name="provider_model_params">Paramètres du modèle</string>
+    <string name="provider_model">Modèle</string>
+    <string name="provider_fetch_models">Récupérer les modèles</string>
+    <string name="provider_fetching_models">Chargement…</string>
+    <string name="provider_models_count">%1$d modèles disponibles, touchez pour choisir</string>
+    <string name="provider_error_empty_url">Veuillez d\'abord saisir l\'URL de l\'API</string>
+    <string name="provider_error_no_models">L\'API n\'a renvoyé aucun modèle</string>
+    <string name="provider_error_fetch_failed">Échec de la récupération des modèles</string>
+    <string name="provider_temperature_label">Température : %1$s</string>
+    <string name="provider_temperature_help_title">Température (Créativité)</string>
+    <string name="provider_temperature_help_text">Détermine le caractère aléatoire des réponses. Plus la valeur est basse, plus les réponses sont stables et fidèles aux consignes ; plus elle est élevée, plus le style est varié et créatif.\n\nRecommandé : 0.8–1.2 pour discuter ; sous 0.3 pour des consignes strictes.\n\nNote : 0 ne garantit pas un résultat identique ; certains fournisseurs plafonnent à 1.0.</string>
+    <string name="provider_max_tokens">Tokens max : %1$d</string>
+
+    <string name="telegram_section_title">Bot Telegram</string>
+    <string name="telegram_enable_label">Activer le Bot Telegram</string>
+    <string name="telegram_enable_desc">Recevoir des notifications push, une bulle sur le personnage et les messages dans le chat</string>
+    <string name="telegram_bot_token">Token du Bot</string>
+    <string name="telegram_bot_token_placeholder">123456:ABC-DEF…</string>
+    <string name="telegram_chat_id">ID de discussion (filtre optionnel)</string>
+    <string name="telegram_chat_id_placeholder">Laisser vide pour accepter tous les chats</string>
+    <string name="telegram_test_connection">Tester la connexion au bot</string>
+    <string name="telegram_testing">Connexion…</string>
+    <string name="telegram_connected_as">Connecté : @%1$s (%2$s)</string>
+    <string name="telegram_error_empty_token">Veuillez d\'abord saisir le Token du Bot Telegram</string>
+    <string name="telegram_error_unknown">Échec de la connexion à Telegram</string>
+    <string name="telegram_notif_permission_btn">Autoriser les notifications</string>
+    <string name="telegram_notif_channel_name">Messages Telegram</string>
+    <string name="telegram_notif_channel_desc">Notifications push reçues depuis votre bot Telegram</string>
+    <string name="telegram_notif_default_sender">Bot Telegram</string>
+
+    <!-- Paramètres discussion & mémoire -->
+    <string name="chat_settings_system_prompt">Prompt système</string>
+    <string name="chat_settings_memory_system">Système de mémoire</string>
+    <string name="chat_settings_enable_memory">Activer la mémoire</string>
+    <string name="chat_settings_enable_memory_desc">Conserver les informations importantes extraites des échanges</string>
+    <string name="chat_settings_auto_summary">Résumé automatique</string>
+    <string name="chat_settings_auto_summary_desc">Résumer régulièrement les échanges en mémoire à long terme</string>
+    <string name="chat_settings_summary_interval">Fréquence du résumé : tous les %1$d tours</string>
+
+    <!-- Apparence, Langue & Modèles Live2D -->
+    <string name="language_section_title">Langue</string>
+    <string name="language_label">Langue de l\'application</string>
+    <string name="language_system">Suivre le système</string>
+    <string name="language_fr">Français</string>
+    <string name="language_en">English</string>
+    <string name="language_es">Español</string>
+    <string name="language_zh">中文</string>
+
+    <string name="live2d_section_title">Modèle Live2D</string>
+    <string name="live2d_section_desc">Changer de personnage ou importer un modèle Cubism externe (.zip) sans recompiler</string>
+    <string name="live2d_builtin_name">Mea (Intégré)</string>
+    <string name="live2d_import_zip">Importer un modèle (.zip)</string>
+    <string name="live2d_importing">Importation du modèle…</string>
+    <string name="live2d_active_badge">Actif</string>
+    <string name="live2d_import_success">Modèle « %1$s » importé et activé</string>
+    <string name="live2d_import_error_open">Impossible de lire le fichier sélectionné</string>
+    <string name="live2d_import_error_empty">L\'archive .zip est vide ou invalide</string>
+    <string name="live2d_import_error_no_model3">Aucun fichier .model3.json trouvé dans l\'archive .zip</string>
+    <string name="live2d_import_error_no_moc">Fichier .moc3 introuvable (référencé par model3.json)</string>
+    <string name="live2d_import_error_failed">Échec de l\'importation du modèle Live2D</string>
+
+    <string name="wallpaper_section_title">Fond d\'écran</string>
+    <string name="wallpaper_section_desc">Choisissez une image de votre galerie pour l\'arrière-plan du chat</string>
+    <string name="wallpaper_preview_cd">Fond d\'écran actuel</string>
+    <string name="wallpaper_default_solid">Fond uni par défaut</string>
+    <string name="wallpaper_pick_gallery">Choisir depuis la galerie</string>
+    <string name="wallpaper_blur_label">Flou d\'arrière-plan : %1$d%%</string>
+    <string name="chat_bubble_alpha_label">Opacité des bulles : %1$d%%</string>
+    <string name="theme_section_title">Thème</string>
+    <string name="theme_mode_label">Mode d\'affichage</string>
+    <string name="theme_mode_system">Suivre le système</string>
+    <string name="theme_mode_light">Clair</string>
+    <string name="theme_mode_dark">Sombre</string>
+    <string name="theme_dynamic_color">Couleurs dynamiques du système</string>
+    <string name="theme_dynamic_color_on_desc">Désactiver pour choisir une palette prédéfinie</string>
+    <string name="theme_dynamic_color_off_desc">Couleurs dynamiques non prises en charge sur cette version Android</string>
+    <string name="theme_presets_label">Palettes prédéfinies</string>
+
+    <string name="preset_default">Violet</string>
+    <string name="preset_ocean">Océan</string>
+    <string name="preset_forest">Forêt</string>
+    <string name="preset_sunset">Crépuscule</string>
+    <string name="preset_rose">Rose</string>
+    <string name="preset_mono">Mono</string>
+    <string name="preset_sky">Ciel</string>
+    <string name="preset_sage">Sauge</string>
+    <string name="preset_lilac">Lilas</string>
+    <string name="preset_terracotta">Terre cuite</string>
+    <string name="preset_amber">Ambre</string>
+    <string name="preset_steel">Acier</string>
+
+    <!-- Voix (TTS) -->
+    <string name="voice_output_section">Sortie vocale</string>
+    <string name="voice_main_label">Voix écran principal</string>
+    <string name="voice_main_desc_ready">Lire les réponses à voix haute sur l\'écran principal</string>
+    <string name="voice_overlay_label">Voix fenêtre flottante</string>
+    <string name="voice_overlay_desc_ready">Lire les réponses dans la fenêtre flottante</string>
+    <string name="voice_model_required_desc">Téléchargez ou importez d\'abord le modèle vocal</string>
+    <string name="voice_speed_label">Vitesse de lecture : %1$sx</string>
+    <string name="voice_debug_preview_btn">Tester la voix (Debug)</string>
+    <string name="voice_debug_preview_title">Saisir le texte de test</string>
+    <string name="voice_debug_preview_default">Bonjour miaou, il fait beau aujourd\'hui.</string>
+    <string name="voice_debug_speak">Lire</string>
+    <string name="voice_model_ready">Modèle vocal prêt</string>
+    <string name="voice_model_ready_desc">Modèle installé, la synthèse vocale est prête</string>
+    <string name="voice_model_delete">Supprimer le modèle</string>
+    <string name="voice_model_downloading">Téléchargement du modèle vocal…</string>
+    <string name="voice_model_importing">Importation du modèle vocal…</string>
+    <string name="voice_model_importing_desc">Extraction de l\'archive, veuillez patienter</string>
+    <string name="voice_model_download_failed">Échec du téléchargement</string>
+    <string name="voice_model_not_downloaded">Modèle vocal non installé</string>
+    <string name="voice_model_desc_with_url">Environ 84 Mo ; débloque la synthèse vocale locale ou import zip</string>
+    <string name="voice_model_desc_no_url">URL de téléchargement absente ; importez depuis un .zip local</string>
+    <string name="voice_model_download">Télécharger</string>
+    <string name="voice_model_import_local">Importer un .zip</string>
+
+    <string name="tts_error_no_url">URL de téléchargement du modèle non configurée</string>
+    <string name="tts_error_incomplete_download">Téléchargement terminé mais fichiers incomplets</string>
+    <string name="tts_error_download_failed">Échec du téléchargement</string>
+    <string name="tts_error_cannot_read_file">Impossible de lire le fichier sélectionné</string>
+    <string name="tts_error_empty_zip">Archive zip vide ou illisible</string>
+    <string name="tts_error_missing_files">Fichiers requis manquants dans l\'archive (%1$s)</string>
+    <string name="tts_import_success">Importation réussie</string>
+    <string name="tts_error_incomplete_import">Échec de l\'importation : fichiers incomplets</string>
+    <string name="tts_error_import_failed">Échec de l\'importation</string>
+
+    <!-- À propos & mises à jour -->
+    <string name="about_app_info">Informations</string>
+    <string name="about_app_title">MeaPet — Compagnon Live2D</string>
+    <string name="about_app_tagline">Un compagnon IA Live2D</string>
+    <string name="about_app_version">Version %1$s</string>
+    <string name="about_poem">Les feuilles d\'automne tombent doucement.\n11·1</string>
+    <string name="about_link_model_source">Source du modèle Live2D</string>
+    <string name="about_link_github">Dépôt GitHub</string>
+    <string name="about_link_group">Groupe communautaire</string>
+    <string name="about_tech_stack">Technologies : Live2D Cubism · Jetpack Compose · Ktor · Markwon · Coroutines · GLSurfaceView · sherpa-onnx · Kotlin 2.2 / AGP 9.3 / minSdk 26</string>
+    <string name="about_update_section">Mises à jour</string>
+    <string name="about_auto_update_label">Vérifier au démarrage</string>
+    <string name="about_auto_update_desc">Recherche silencieuse au lancement ; vérification manuelle toujours possible ici</string>
+    <string name="about_checking">Vérification…</string>
+    <string name="about_check_now">Vérifier maintenant</string>
+    <string name="about_open_release">Ouvrir la page de version</string>
+    <string name="about_view_privacy">Voir la politique de confidentialité</string>
+    <string name="about_exporting_logs">Exportation des journaux…</string>
+    <string name="about_export_logs">Exporter les journaux</string>
+    <string name="about_analytics_title">Collecte de données statistiques</string>
+    <string name="about_analytics_no_sdk">Cette version ne contient aucun SDK statistique ; aucune donnée n\'est collectée</string>
+    <string name="about_analytics_agreed">Autorisé : le SDK Umeng collecte des statistiques anonymisées</string>
+    <string name="about_analytics_revoked">Non autorisé : aucune collecte ; l\'application fonctionne normalement</string>
+    <string name="about_revoke_consent">Révoquer l\'autorisation</string>
+    <string name="about_revoke_dialog_text">Pour garantir l\'arrêt immédiat de la collecte, l\'application va se fermer. Vous pourrez la rouvrir normalement sans aucune télémétrie.</string>
+    <string name="about_revoke_confirm">Confirmer et quitter</string>
+    <string name="about_revoke_keep">Conserver</string>
+    <string name="about_icons_attribution_title">Icônes Open-Source</string>
+    <string name="about_icons_attribution_body">Icônes issues de Material Design Icons (Pictogrammers) sous licence Apache 2.0.</string>
+
+    <string name="update_available_notice">Nouvelle version disponible : v%1$s</string>
+    <string name="update_up_to_date">Application à jour (v%1$s)</string>
+    <string name="update_error_no_release">Aucune version officielle publiée</string>
+    <string name="update_error_http">Échec de la vérification (HTTP %1$d)</string>
+    <string name="update_error_parse">Impossible de lire les infos de version</string>
+    <string name="update_error_network">Erreur réseau, échec de la vérification</string>
+
+    <!-- Dialogues : Confidentialité & Mise à jour -->
+    <string name="privacy_update_subtitle">Politique de confidentialité mise à jour</string>
+    <string name="privacy_dialog_title_policy">Politique de confidentialité</string>
+    <string name="privacy_dialog_title_consent">Confidentialité et collecte de données</string>
+    <string name="privacy_welcome">Bienvenue sur MeaPet !</string>
+    <string name="privacy_summary_body">Cette application intègre le SDK Umeng+ pour collecter des statistiques d\'utilisation anonymisées (lancements, durée). Le SDK peut collecter des identifiants d\'appareil et l\'état réseau.</string>
+    <string name="privacy_read_full_prefix">Consultez la </string>
+    <string name="privacy_read_full_link">Politique de confidentialité</string>
+    <string name="privacy_read_full_suffix"> complète.</string>
+    <string name="privacy_bullets">• Accepter : active les statistiques anonymisées\n• Refuser : aucune collecte, toutes les fonctionnalités restent actives\n• Révocable à tout moment dans les Paramètres</string>
+    <string name="privacy_btn_view_policy">Lire la politique</string>
+    <string name="privacy_btn_disagree">Refuser</string>
+    <string name="privacy_btn_agree">Accepter</string>
+
+    <string name="update_opt_in_title">Vérifier les mises à jour</string>
+    <string name="update_opt_in_body">Vérifier automatiquement les mises à jour au démarrage ?\n\nVous pouvez aussi le faire manuellement dans Paramètres → À propos.</string>
+    <string name="update_opt_in_disable">Non merci</string>
+    <string name="update_opt_in_enable">Activer</string>
+
+    <!-- Texte complet politique de confidentialité -->
+    <string name="policy_version_label">Version : %1$s</string>
+    <string name="policy_effective_label">En vigueur : %1$s</string>
+    <string name="policy_updated_label">Mise à jour : %1$s</string>
+    <string name="policy_sec_overview">1. Aperçu</string>
+    <string name="policy_overview_umeng">Cette politique est établie par %1$s (« Développeur ») pour MeaPet. Cette version intègre le SDK Umeng+ afin de collecter des mesures d\'usage anonymisées.</string>
+    <string name="policy_overview_nosdk">Cette politique est établie par %1$s (« Développeur ») pour MeaPet. Cette version ne contient aucun SDK de télémétrie et ne collecte aucune donnée.</string>
+    <string name="policy_sec_collected">2. Données collectées</string>
+    <string name="policy_collected_1">Identifiants d\'appareil (OAID, Android ID, modèle, version OS)</string>
+    <string name="policy_collected_2">Informations réseau (Wi-Fi/mobile, adresse IP)</string>
+    <string name="policy_collected_3">Usage de l\'application (lancements, durée, version, canal)</string>
+    <string name="policy_collected_4">Métriques d\'exécution du SDK pour la stabilité</string>
+    <string name="policy_sec_purpose">3. Finalités</string>
+    <string name="policy_purpose_1">Générer un identifiant statistique anonymisé</string>
+    <string name="policy_purpose_2">Mesurer l\'activité et l\'utilisation</string>
+    <string name="policy_purpose_3">Corriger les plantages et optimiser les performances</string>
+    <string name="policy_sec_sdk">4. SDK tiers</string>
+    <string name="policy_sdk_name">Nom du SDK : Umeng+ Analytics SDK</string>
+    <string name="policy_sdk_type">Type : Statistiques d\'application</string>
+    <string name="policy_sdk_data">Données : Identifiants appareil, réseau, usage, journaux</string>
+    <string name="policy_sdk_link">Lien vers la politique :</string>
+    <string name="policy_sec_consent">5. Gestion du consentement</string>
+    <string name="policy_consent_1">Au premier démarrage, vous pouvez accepter ou refuser la collecte</string>
+    <string name="policy_consent_2">En cas de refus, le SDK n\'est jamais initialisé</string>
+    <string name="policy_consent_3">La pré-initialisation ne collecte ni ne transmet aucune donnée</string>
+    <string name="policy_consent_4">Vous pouvez révoquer votre accord dans les Paramètres à tout moment</string>
+    <string name="policy_sec_security">6. Sécurité</string>
+    <string name="policy_security_body">Les données collectées par Umeng+ sont anonymisées et chiffrées en transit.</string>
+    <string name="policy_sec_rights">7. Vos droits</string>
+    <string name="policy_rights_1">Révoquer le consentement dans les Paramètres</string>
+    <string name="policy_rights_2">Désinstaller l\'application pour supprimer les données locales</string>
+    <string name="policy_rights_3">Effacer les données via les paramètres Android</string>
+    <string name="policy_sec_processing">2. Traitement des données</string>
+    <string name="policy_nosdk_1">Cette version n\'embarque aucun SDK statistique et n\'envoie aucune télémétrie</string>
+    <string name="policy_nosdk_2">Vos discussions, souvenirs et réglages restent strictement locaux</string>
+    <string name="policy_sec_rights_nosdk">3. Vos droits</string>
+    <string name="policy_sec_contact_umeng">8. Contact</string>
+    <string name="policy_sec_contact_nosdk">4. Contact</string>
+    <string name="policy_contact_body">Responsable : %1$s. Pour toute question, ouvrez un ticket sur le dépôt GitHub (%2$s).</string>
+
+    <!-- Fenêtre flottante -->
+    <string name="overlay_channel_name">Fenêtre Live2D</string>
+    <string name="overlay_channel_desc">Affiche le personnage Live2D par-dessus les autres applications</string>
+    <string name="overlay_notif_title">Fenêtre Live2D active</string>
+    <string name="overlay_notif_text">Double appui : menu · Glisser : déplacer · Pincer : redimensionner</string>
+    <string name="overlay_menu_close">Fermer la fenêtre</string>
+    <string name="overlay_menu_input">Saisir un message</string>
+    <string name="overlay_menu_unlock">Déverrouiller</string>
+    <string name="overlay_menu_lock">Verrouiller</string>
+    <string name="overlay_menu_alpha">Opacité</string>
+    <string name="overlay_alpha_label">Opacité %1$d%%</string>
+    <string name="overlay_send_failed">Échec de l\'envoi : %1$s</string>
+    <string name="overlay_unknown_error">Erreur inconnue</string>
+
+    <!-- Erreurs API & journaux -->
+    <string name="api_err_401">Clé API invalide ou manquante. Configurez-la dans les Paramètres.</string>
+    <string name="api_err_402">Solde API insuffisant. Veuillez recharger votre compte.</string>
+    <string name="api_err_403">Permission refusée pour cette clé API.</string>
+    <string name="api_err_404">URL introuvable. Vérifiez l\'adresse de l\'API.</string>
+    <string name="api_err_429">Trop de requêtes. Réessayez plus tard.</string>
+    <string name="api_err_http">Échec de la requête API (HTTP %1$d)</string>
+    <string name="api_err_server_detail">%1$s\n(Serveur : %2$s)</string>
+    <string name="log_share_subject">Journaux MeaPet %1$s</string>
+    <string name="log_share_chooser">Partager les journaux avec le développeur</string>
+</resources>

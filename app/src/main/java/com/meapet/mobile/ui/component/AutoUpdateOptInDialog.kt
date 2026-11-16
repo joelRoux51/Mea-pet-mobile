@@ -17,9 +17,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.meapet.mobile.R
 
 /**
  * 「是否启用检查更新」确认弹窗。
@@ -50,7 +52,7 @@ fun AutoUpdateOptInDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "检查更新",
+                    text = stringResource(R.string.update_opt_in_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -60,7 +62,7 @@ fun AutoUpdateOptInDialog(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "是否在应用启动时自动检查新版本？\n\n开启后，检测到新版本时会提示你；关闭后你仍可以在「关于」页面手动检测更新。",
+                    text = stringResource(R.string.update_opt_in_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -72,11 +74,11 @@ fun AutoUpdateOptInDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDisable) {
-                        Text("不开启")
+                        Text(stringResource(R.string.update_opt_in_disable))
                     }
                     Spacer(Modifier.width(8.dp))
                     TextButton(onClick = onEnable) {
-                        Text("开启")
+                        Text(stringResource(R.string.update_opt_in_enable))
                     }
                 }
             }

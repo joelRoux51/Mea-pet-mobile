@@ -151,7 +151,7 @@ class SettingsViewModelTest {
 
         vm.fetchModels("key", "")
 
-        assertEquals("请先填写 API 地址", vm.state.value.modelsError)
+        assertEquals("Please enter an API URL first", vm.state.value.modelsError)
     }
 
     /**

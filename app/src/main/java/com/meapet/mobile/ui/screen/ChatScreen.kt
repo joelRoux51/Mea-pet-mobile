@@ -2,11 +2,15 @@ package com.meapet.mobile.ui.screen
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,18 +23,24 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,16 +53,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.meapet.mobile.R
 import com.meapet.mobile.app.MeaPetApplication
+import com.meapet.mobile.chat.CharacterBubbleUi
 import com.meapet.mobile.viewmodel.ChatEvent
 import com.meapet.mobile.chat.ChatUiState
 import com.meapet.mobile.chat.MemoryDialogUi
@@ -184,11 +200,12 @@ private fun ChatPage(
 
     // 启动静默更新提示：有新版本时底部轻提示，可点「查看」打开 GitHub Release
     val uriHandler = LocalUriHandler.current
+    val viewLabel = stringResource(R.string.action_view)
     LaunchedEffect(state.updateNotice) {
         val notice = state.updateNotice ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
             message = notice.message,
-            actionLabel = "查看",
+            actionLabel = viewLabel,
             duration = SnackbarDuration.Long,
             withDismissAction = true
         )
@@ -215,7 +232,23 @@ private fun ChatPage(
             onRetry = { chatViewModel.onEvent(ChatEvent.RetryLastMessage) }
         )
 
-        // ── Layer 2: 顶部菜单 ──
+        // ── Layer 2: 顶部菜单与角色对话气泡 ──
+        AnimatedVisibility(
+            visible = state.characterBubble != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.9f),
+            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 56.dp, start = 20.dp, end = 64.dp)
+        ) {
+            state.characterBubble?.let { bubble ->
+                CharacterDialogueBubble(
+                    bubble = bubble,
+                    onDismiss = { chatViewModel.onEvent(ChatEvent.DismissCharacterBubble) }
+                )
+            }
+        }
+
         OverlayMenu(
             onToggleOverlay = onToggleOverlay,
             onClearConversation = {
@@ -296,7 +329,7 @@ private fun MessageList(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "开始和 Mea 对话吧！\n发送一条消息开始聊天 🐾",
+                        text = stringResource(R.string.chat_empty_hint),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
@@ -320,7 +353,7 @@ private fun MessageList(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Mea 正在思考...",
+                        text = stringResource(R.string.chat_thinking),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
@@ -372,16 +405,21 @@ private fun MemoryDialog(
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Mea 的记忆", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.memory_dialog_title), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
 
                 val stats = dialog.stats
                 Text(
                     text = if (dialog.isMemoryEnabled) {
-                        "共 ${stats.totalCount} 条 · 短期 ${stats.shortTermCount} · " +
-                            "长期 ${stats.longTermCount} · 事实 ${stats.factualsCount}"
+                        stringResource(
+                            R.string.memory_stats_summary,
+                            stats.totalCount,
+                            stats.shortTermCount,
+                            stats.longTermCount,
+                            stats.factualsCount
+                        )
                     } else {
-                        "记忆功能已关闭（可在设置中开启）"
+                        stringResource(R.string.memory_disabled_hint)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -399,7 +437,7 @@ private fun MemoryDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "还没有记忆喵~\n多和 Mea 聊聊天吧",
+                            text = stringResource(R.string.memory_empty_hint),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -423,23 +461,30 @@ private fun MemoryDialog(
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                     Spacer(Modifier.height(2.dp))
+                                    val typeLabel = memoryTypeLabel(memory.type)
+                                    val importanceLabel = stringResource(
+                                        R.string.memory_importance,
+                                        (memory.importance * 100).toInt()
+                                    )
+                                    val keywordsLabel = if (memory.keywords.isNotEmpty()) {
+                                        " · " + stringResource(
+                                            R.string.memory_keywords,
+                                            memory.keywords.joinToString(", ")
+                                        )
+                                    } else {
+                                        ""
+                                    }
                                     Text(
-                                        text = buildString {
-                                            append(memoryTypeLabel(memory.type))
-                                            append(" · 重要性 ")
-                                            append((memory.importance * 100).toInt())
-                                            append("%")
-                                            if (memory.keywords.isNotEmpty()) {
-                                                append(" · 关键词: ")
-                                                append(memory.keywords.joinToString(", "))
-                                            }
-                                        },
+                                        text = "$typeLabel · $importanceLabel$keywordsLabel",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
                                 }
                                 TextButton(onClick = { onDeleteMemory(memory.id) }) {
-                                    Text("删除", style = MaterialTheme.typography.labelSmall)
+                                    Text(
+                                        stringResource(R.string.action_delete),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
                                 }
                             }
                             HorizontalDivider(
@@ -458,10 +503,10 @@ private fun MemoryDialog(
                         onClick = onClearAll,
                         enabled = dialog.memories.isNotEmpty()
                     ) {
-                        Text("清除全部")
+                        Text(stringResource(R.string.action_clear_all))
                     }
                     TextButton(onClick = onDismiss) {
-                        Text("关闭")
+                        Text(stringResource(R.string.action_close))
                     }
                 }
             }
@@ -469,13 +514,77 @@ private fun MemoryDialog(
     }
 }
 
-/** 记忆类型的中文标签。 */
-private fun memoryTypeLabel(type: MemoryType): String = when (type) {
-    MemoryType.SHORT_TERM -> "短期"
-    MemoryType.LONG_TERM -> "长期"
-    MemoryType.CORE_TRAIT -> "特质"
-    MemoryType.FACTUAL -> "事实"
+/** Speech bubble displayed directly above the Live2D character (e.g. incoming Telegram message). */
+@Composable
+private fun CharacterDialogueBubble(
+    bubble: CharacterBubbleUi,
+    onDismiss: () -> Unit
+) {
+    val containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            modifier = Modifier.widthIn(min = 160.dp, max = 300.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = containerColor,
+            tonalElevation = 6.dp,
+            shadowElevation = 6.dp
+        ) {
+            Column(modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (bubble.isTelegram) {
+                            "${stringResource(R.string.chat_telegram_badge)} · ${bubble.sender}"
+                        } else {
+                            bubble.sender
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_close),
+                            contentDescription = stringResource(R.string.chat_dialogue_dismiss),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = bubble.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
+        // Downward pointer tail toward the Live2D character
+        Canvas(modifier = Modifier.size(width = 18.dp, height = 9.dp)) {
+            val path = Path().apply {
+                moveTo(0f, 0f)
+                lineTo(size.width / 2f, size.height)
+                lineTo(size.width, 0f)
+                close()
+            }
+            drawPath(path = path, color = containerColor)
+        }
+    }
 }
+
+@Composable
+private fun memoryTypeLabel(type: MemoryType): String = stringResource(
+    when (type) {
+        MemoryType.SHORT_TERM -> R.string.memory_type_short_term
+        MemoryType.LONG_TERM -> R.string.memory_type_long_term
+        MemoryType.CORE_TRAIT -> R.string.memory_type_core_trait
+        MemoryType.FACTUAL -> R.string.memory_type_factual
+    }
+)
 
 /** 立即结束应用进程（隐私撤销授权后的合规退出，确保上报线程停止）。 */
 private fun exitAppSilently() {

@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
@@ -100,7 +101,7 @@ fun OverlayMenu(
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(
                     painter = painterResource(R.drawable.ic_menu_more),
-                    contentDescription = "更多选项",
+                    contentDescription = stringResource(R.string.menu_more_options),
                     tint = Color.White
                 )
             }
@@ -128,13 +129,13 @@ fun OverlayMenu(
                         shadowElevation = 8.dp
                     ) {
                         Column {
-                            MenuEntry("设置", R.drawable.ic_menu_settings) { menuExpanded = false; onSettings() }
+                            MenuEntry(stringResource(R.string.menu_settings), R.drawable.ic_menu_settings) { menuExpanded = false; onSettings() }
                             HorizontalDivider()
-                            MenuEntry("清除对话", R.drawable.ic_menu_clear) { menuExpanded = false; onClearConversation() }
+                            MenuEntry(stringResource(R.string.menu_clear_conversation), R.drawable.ic_menu_clear) { menuExpanded = false; onClearConversation() }
                             HorizontalDivider()
-                            MenuEntry("查看记忆", R.drawable.ic_menu_memory) { menuExpanded = false; onShowMemories() }
+                            MenuEntry(stringResource(R.string.menu_view_memories), R.drawable.ic_menu_memory) { menuExpanded = false; onShowMemories() }
                             HorizontalDivider()
-                            MenuEntry("悬浮窗", R.drawable.ic_menu_overlay) { menuExpanded = false; onToggleOverlay() }
+                            MenuEntry(stringResource(R.string.menu_overlay), R.drawable.ic_menu_overlay) { menuExpanded = false; onToggleOverlay() }
                         }
                     }
                 }
@@ -187,7 +188,7 @@ private fun SpeakerButton(ttsManager: TtsManager) {
         IconButton(onClick = { ttsManager.toggleSessionMute() }) {
             Icon(
                 painter = painterResource(icon),
-                contentDescription = if (muted) "开启本次语音" else "关闭本次语音",
+                contentDescription = stringResource(if (muted) R.string.tts_unmute_session else R.string.tts_mute_session),
                 tint = tint
             )
         }

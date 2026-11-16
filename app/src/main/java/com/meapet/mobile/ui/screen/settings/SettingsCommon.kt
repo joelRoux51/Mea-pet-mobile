@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.meapet.mobile.R
@@ -140,7 +141,9 @@ internal fun ParamLabelWithHelp(
                 RichTooltip(
                     title = { Text(helpTitle) },
                     action = {
-                        TextButton(onClick = { tooltipState.dismiss() }) { Text("知道了") }
+                        TextButton(onClick = { tooltipState.dismiss() }) {
+                            Text(stringResource(R.string.action_got_it))
+                        }
                     }
                 ) {
                     Text(helpText)
@@ -155,7 +158,7 @@ internal fun ParamLabelWithHelp(
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_help_outline),
-                    contentDescription = "$helpTitle 说明",
+                    contentDescription = stringResource(R.string.settings_help_suffix, helpTitle),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_FAINT_TEXT),
                     modifier = Modifier.size(16.dp)
                 )

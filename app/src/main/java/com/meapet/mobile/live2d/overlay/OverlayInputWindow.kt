@@ -74,9 +74,6 @@ class OverlayInputWindow(
         /** 等待窗口焦点回调的兜底上限：超时仍未收到就直接试弹一次键盘。 */
         private const val FOCUS_FALLBACK_MS = 400L
 
-        /** 输入占位符，与主界面一致。 */
-        private const val PLACEHOLDER = "给 Mea 发个消息..."
-
         /** 输入条固定宽度，dp（紧凑但够输入）。 */
         private const val BAR_WIDTH_DP = 260f
 
@@ -142,7 +139,7 @@ class OverlayInputWindow(
     init {
         // 透明无下划线的输入框，紧凑单行
         editText = EditText(ctx).apply {
-            setHint(PLACEHOLDER)
+            setHint(ctx.getString(R.string.chat_input_placeholder))
             setHintTextColor(palette.onSurfaceVariant.withAlpha(0x99))  // ≈ 60% 透明
             setTextColor(palette.onSurface)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
@@ -174,7 +171,7 @@ class OverlayInputWindow(
         // 初始禁用态在 init 末尾统一刷新（editText/sendButton 均就绪后）
         sendButton = ImageButton(ctx).apply {
             setImageResource(R.drawable.ic_send)
-            contentDescription = "发送"
+            contentDescription = ctx.getString(R.string.action_send)
             setOnClickListener { sendIfPossible() }
         }
 
@@ -199,7 +196,7 @@ class OverlayInputWindow(
         val closeButton = ImageView(ctx).apply {
             setImageResource(R.drawable.ic_close)
             setColorFilter(palette.onSurfaceVariant)
-            contentDescription = "关闭"
+            contentDescription = ctx.getString(R.string.action_close)
             isClickable = true
             val outValue = TypedValue()
             ctx.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
@@ -211,7 +208,7 @@ class OverlayInputWindow(
         val grip = ImageView(ctx).apply {
             setImageResource(R.drawable.ic_drag)
             setColorFilter(palette.onSurfaceVariant.withAlpha(0xA6))
-            contentDescription = "拖动"
+            contentDescription = ctx.getString(R.string.action_drag)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setOnTouchListener { _, event -> handleDrag(event) }
         }

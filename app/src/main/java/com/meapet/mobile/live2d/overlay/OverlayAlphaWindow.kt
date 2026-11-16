@@ -242,7 +242,7 @@ class OverlayAlphaWindow(
         MIN_ALPHA + (progress.toFloat() / STEPS) * (1f - MIN_ALPHA)
 
     private fun updateLabel(alpha: Float) {
-        valueLabel.text = "透明度 ${(alpha * 100).roundToInt()}%"
+        valueLabel.text = ctx.getString(R.string.overlay_alpha_label, (alpha * 100).roundToInt())
     }
 
     private fun dp(v: Number): Int = (v.toFloat() * density).roundToInt()

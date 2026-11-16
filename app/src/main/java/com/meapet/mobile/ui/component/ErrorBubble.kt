@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,7 +65,7 @@ fun ErrorBubble(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "发送失败",
+                    text = stringResource(R.string.chat_send_failed_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = alpha),
@@ -76,7 +77,7 @@ fun ErrorBubble(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_close),
-                        contentDescription = "关闭",
+                        contentDescription = stringResource(R.string.action_close),
                         tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = alpha),
                         modifier = Modifier.size(18.dp)
                     )
@@ -108,7 +109,7 @@ fun ErrorBubble(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "重试",
+                        text = stringResource(R.string.action_retry),
                         color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = alpha),
                         fontWeight = FontWeight.SemiBold
                     )

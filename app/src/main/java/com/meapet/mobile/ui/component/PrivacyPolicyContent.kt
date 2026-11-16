@@ -8,9 +8,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.meapet.mobile.BuildConfig
+import com.meapet.mobile.R
 import com.meapet.mobile.core.AppInfo
 
 // ═══════════════════════════════════════════════════
@@ -48,45 +50,45 @@ fun PrivacyPolicyContent() {
 private fun PrivacyPolicyWithUmeng() {
     PrivacyHeader()
 
-    PrivacySection("一、概述") {
+    PrivacySection(stringResource(R.string.policy_sec_overview)) {
         Text(
-            "本隐私政策由 ${AppInfo.devName}（下称「开发者」）制定并生效，适用于 MeaPet（梅尔桌宠）应用。本应用集成了友盟+（Umeng）统计 SDK，用于收集去标识化的使用数据以帮助改进产品质量。本隐私政策说明了数据采集的范围、用途与你的权利。",
+            stringResource(R.string.policy_overview_umeng, AppInfo.devName),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
-    PrivacySection("二、采集的信息") {
-        PrivacyBullet("设备标识符：包括 OAID、Android ID、设备型号、操作系统版本等设备信息，用于生成脱敏的终端用户设备唯一性标识")
-        PrivacyBullet("网络信息：网络类型（WiFi/移动网络）、IP 地址，用于网络请求发送统计数据")
-        PrivacyBullet("应用使用信息：启动次数、使用时长、版本号、渠道来源")
-        PrivacyBullet("统计基础库运行信息：用于统计 SDK 的稳定性监控与风控分析")
+    PrivacySection(stringResource(R.string.policy_sec_collected)) {
+        PrivacyBullet(stringResource(R.string.policy_collected_1))
+        PrivacyBullet(stringResource(R.string.policy_collected_2))
+        PrivacyBullet(stringResource(R.string.policy_collected_3))
+        PrivacyBullet(stringResource(R.string.policy_collected_4))
     }
 
-    PrivacySection("三、信息用途") {
-        PrivacyBullet("基于设备信息用于生成脱敏的终端用户设备唯一性标识，以确保提供统计服务")
-        PrivacyBullet("统计应用的活跃用户数、启动次数、使用时长等运营指标")
-        PrivacyBullet("帮助开发者发现并修复应用崩溃与性能问题")
+    PrivacySection(stringResource(R.string.policy_sec_purpose)) {
+        PrivacyBullet(stringResource(R.string.policy_purpose_1))
+        PrivacyBullet(stringResource(R.string.policy_purpose_2))
+        PrivacyBullet(stringResource(R.string.policy_purpose_3))
     }
 
-    PrivacySection("四、第三方 SDK 信息") {
+    PrivacySection(stringResource(R.string.policy_sec_sdk)) {
         Text(
-            "SDK 名称：友盟+ 统计 SDK",
+            stringResource(R.string.policy_sdk_name),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "服务类型：应用统计分析",
+            stringResource(R.string.policy_sdk_type),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "收集个人信息类型：设备标识符（OAID、Android ID、设备型号、操作系统版本等）、网络信息、应用使用信息、统计基础库运行信息",
+            stringResource(R.string.policy_sdk_data),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "隐私权政策链接：",
+            stringResource(R.string.policy_sdk_link),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -97,30 +99,30 @@ private fun PrivacyPolicyWithUmeng() {
         )
     }
 
-    PrivacySection("五、授权管理") {
-        PrivacyBullet("首次启动时，你可以在弹窗中选择同意或不同意数据采集")
-        PrivacyBullet("不同意：App 正常使用，但不会初始化统计 SDK，不采集任何统计数据")
-        PrivacyBullet("应用每次启动会进行统计 SDK 的预初始化（该阶段仅完成 SDK 初始化准备，不采集、不上报任何数据）；正式初始化并开始采集，仅在您同意后进行")
-        PrivacyBullet("同意后可随时在「设置」中取消授权。为确保撤回后立即、彻底停止数据采集，取消授权后 App 将自动退出；重新打开即可正常使用，且不会再进行任何统计采集")
+    PrivacySection(stringResource(R.string.policy_sec_consent)) {
+        PrivacyBullet(stringResource(R.string.policy_consent_1))
+        PrivacyBullet(stringResource(R.string.policy_consent_2))
+        PrivacyBullet(stringResource(R.string.policy_consent_3))
+        PrivacyBullet(stringResource(R.string.policy_consent_4))
     }
 
-    PrivacySection("六、数据安全") {
+    PrivacySection(stringResource(R.string.policy_sec_security)) {
         Text(
-            "友盟+ SDK 采集的数据均经去标识化处理，仅用于统计与分析目的，不用于识别具体个人。数据传输使用加密通道。友盟+ 遵循相关法律法规对数据进行安全管理。",
+            stringResource(R.string.policy_security_body),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
-    PrivacySection("七、你的权利") {
-        PrivacyBullet("你可以随时在「设置」中取消数据采集授权")
-        PrivacyBullet("取消授权后，你可以选择是否卸载本应用以删除本地数据")
-        PrivacyBullet("你可以在系统中清除应用数据，以删除本地保存的配置信息")
+    PrivacySection(stringResource(R.string.policy_sec_rights)) {
+        PrivacyBullet(stringResource(R.string.policy_rights_1))
+        PrivacyBullet(stringResource(R.string.policy_rights_2))
+        PrivacyBullet(stringResource(R.string.policy_rights_3))
     }
 
-    PrivacySection("八、联系我们") {
+    PrivacySection(stringResource(R.string.policy_sec_contact_umeng)) {
         Text(
-            "本隐私政策主体为 ${AppInfo.devName}。如有任何关于隐私与数据采集的疑问，可通过 GitHub 仓库（${AppInfo.gitRepoUrl}）Issues 联系开发者。",
+            stringResource(R.string.policy_contact_body, AppInfo.devName, AppInfo.gitRepoUrl),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -132,26 +134,26 @@ private fun PrivacyPolicyWithUmeng() {
 private fun PrivacyPolicyWithoutSdk() {
     PrivacyHeader()
 
-    PrivacySection("一、概述") {
+    PrivacySection(stringResource(R.string.policy_sec_overview)) {
         Text(
-            "本隐私政策由 ${AppInfo.devName}（下称「开发者」）制定并生效，适用于 MeaPet（梅尔桌宠）应用。本构建未包含任何统计 SDK，应用不采集任何使用数据。本隐私政策说明应用的数据处理情况与你的权利。",
+            stringResource(R.string.policy_overview_nosdk, AppInfo.devName),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
-    PrivacySection("二、数据处理") {
-        PrivacyBullet("本构建未包含统计 SDK，应用不采集、不上报任何使用数据")
-        PrivacyBullet("你的聊天、记忆与设置等数据仅存储于本机，不会上传")
+    PrivacySection(stringResource(R.string.policy_sec_processing)) {
+        PrivacyBullet(stringResource(R.string.policy_nosdk_1))
+        PrivacyBullet(stringResource(R.string.policy_nosdk_2))
     }
 
-    PrivacySection("三、你的权利") {
-        PrivacyBullet("你可以随时清除应用数据，以删除本地保存的配置与记录")
+    PrivacySection(stringResource(R.string.policy_sec_rights_nosdk)) {
+        PrivacyBullet(stringResource(R.string.policy_rights_3))
     }
 
-    PrivacySection("四、联系我们") {
+    PrivacySection(stringResource(R.string.policy_sec_contact_nosdk)) {
         Text(
-            "本隐私政策主体为 ${AppInfo.devName}。如有任何关于隐私与数据处理的疑问，可通过 GitHub 仓库（${AppInfo.gitRepoUrl}）Issues 联系开发者。",
+            stringResource(R.string.policy_contact_body, AppInfo.devName, AppInfo.gitRepoUrl),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -167,17 +169,17 @@ private fun PrivacyHeader() {
         modifier = Modifier.padding(bottom = 8.dp)
     ) {
         Text(
-            "版本：${PRIVACY_POLICY_VERSION}",
+            stringResource(R.string.policy_version_label, PRIVACY_POLICY_VERSION),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "生效时间：${PRIVACY_POLICY_EFFECTIVE_DATE}",
+            stringResource(R.string.policy_effective_label, PRIVACY_POLICY_EFFECTIVE_DATE),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            "修订时间：${PRIVACY_POLICY_UPDATE_DATE}",
+            stringResource(R.string.policy_updated_label, PRIVACY_POLICY_UPDATE_DATE),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

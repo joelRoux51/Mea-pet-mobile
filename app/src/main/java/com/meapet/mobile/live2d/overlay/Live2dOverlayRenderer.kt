@@ -7,7 +7,9 @@ import com.live2d.sdk.cubism.framework.CubismFramework
 import com.live2d.sdk.cubism.framework.math.CubismMatrix44
 import com.live2d.sdk.cubism.framework.rendering.android.CubismOffscreenManagerAndroid
 import com.live2d.sdk.cubism.framework.rendering.android.CubismShaderAndroid
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dModel
+import com.meapet.mobile.live2d.Live2dModelSpec
 import com.meapet.mobile.live2d.Live2dPal
 import com.meapet.mobile.live2d.Live2dTextureManager
 import javax.microedition.khronos.egl.EGLConfig
@@ -35,6 +37,7 @@ class Live2dOverlayRenderer(
     private var winWidth = 0
     private var winHeight = 0
     private var modelLoaded = false
+    private var loadedSpec: Live2dModelSpec? = null
 
     /**
      * 悬浮窗整体不透明度（0.0~1.0）。
@@ -63,6 +66,7 @@ class Live2dOverlayRenderer(
         model?.deleteModel()
         model = null
         modelLoaded = false
+        loadedSpec = null
     }
 
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
@@ -101,8 +105,13 @@ class Live2dOverlayRenderer(
             // 服务正在关闭时不执行任何 GL 操作，防止竞态崩溃
             if (isShuttingDown()) return
 
-            if (!modelLoaded) {
-                loadModel()
+            val currentSpec = Live2dManager.getInstance().activeSpec
+            if (!modelLoaded || loadedSpec != currentSpec) {
+                if (modelLoaded) {
+                    textureManager?.releaseInvalidTextures()
+                    releaseModel()
+                }
+                loadModel(currentSpec)
                 modelLoaded = true
                 if (isShuttingDown()) return
             }
@@ -161,16 +170,17 @@ class Live2dOverlayRenderer(
         }
     }
 
-    private fun loadModel() {
+    private fun loadModel(spec: Live2dModelSpec) {
         try {
-            val dir = "live2d/mea_live2d/"
-            val fileName = "mea.model3.json"
+            val dir = spec.dirPath
+            val fileName = spec.modelJsonName
             val m = Live2dModel(dir)
             val tm = textureManager ?: return
             m.loadAssets(dir, fileName)
             m.bindTextures(tm)
             model = m
-            Log.d(TAG, "Overlay model loaded successfully")
+            loadedSpec = spec
+            Log.d(TAG, "Overlay model loaded successfully: ${spec.displayName}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load overlay model", e)
             // 释放可能已部分构建的模型，并停掉服务——

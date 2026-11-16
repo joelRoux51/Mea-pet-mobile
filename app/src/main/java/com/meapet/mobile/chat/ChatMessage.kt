@@ -32,6 +32,7 @@ data class ChatMessage(
     val memoryOpsBlock: String? = null,
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
+    val source: String = SOURCE_CHAT,
     @Transient val isStreaming: Boolean = false
 ) {
     /** 是否为用户消息。 */
@@ -42,4 +43,12 @@ data class ChatMessage(
 
     /** 是否为系统消息。 */
     val isSystem: Boolean get() = role == ChatRole.system
+
+    /** 是否来自 Telegram Bot 推送。 */
+    val isFromTelegram: Boolean get() = source == SOURCE_TELEGRAM
+
+    companion object {
+        const val SOURCE_CHAT = "chat"
+        const val SOURCE_TELEGRAM = "telegram"
+    }
 }

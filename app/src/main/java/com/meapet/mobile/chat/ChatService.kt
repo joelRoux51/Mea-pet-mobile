@@ -130,9 +130,7 @@ class ChatService(
                 if (assistantContent == null) {
                     Log.w(TAG, "Unexpected API response: missing choices or content")
                     conversationManager.removeMessage(userMessage.id)
-                    return@withContext Result.failure(
-                        IllegalStateException("API 响应中没有有效的回复内容")
-                    )
+                    return@withContext Result.failure(EmptyReplyException())
                 }
                 // 6b) 剥离模型附在回复末尾的记忆协议块（对用户不可见，见 MemoryOpsProtocol）
                 val parsed = MemoryOpsProtocol.extract(assistantContent)
@@ -223,3 +221,6 @@ class ChatService(
         Log.i(TAG, "Chat history restored from undo snapshot (${snapshot.size} messages)")
     }
 }
+
+class EmptyReplyException : IllegalStateException("API response did not contain valid reply content")
+

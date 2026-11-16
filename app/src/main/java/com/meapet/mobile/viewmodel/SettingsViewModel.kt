@@ -1,19 +1,28 @@
 package com.meapet.mobile.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.meapet.mobile.R
+import com.meapet.mobile.app.MeaPetApplication
 import com.meapet.mobile.client.OpenAiCompatibleClient
 import com.meapet.mobile.client.exception.ApiException
 import com.meapet.mobile.client.model.ApiResponse
 import com.meapet.mobile.core.AppInfo
+import com.meapet.mobile.core.LocaleHelper
 import com.meapet.mobile.core.PrivacyConsentManager
 import com.meapet.mobile.core.UndoableAction
+import com.meapet.mobile.core.getStringOrFallback
 import com.meapet.mobile.core.undoWindowMs
-import com.meapet.mobile.app.MeaPetApplication
+import com.meapet.mobile.live2d.Live2dImportResult
+import com.meapet.mobile.live2d.Live2dModelSpec
+import com.meapet.mobile.live2d.Live2dModelStore
 import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.settings.SettingsManager
+import com.meapet.mobile.telegram.TelegramBotClient
 import com.meapet.mobile.tts.model.TtsModelManager
 import com.meapet.mobile.tts.model.TtsModelState
 import com.meapet.mobile.update.UpdateCheckResult
@@ -80,37 +89,45 @@ data class SettingsUiState(
     val wallpaperPath: String = SettingsKeys.Defaults.WALLPAPER_PATH,
     /** 主界面背景壁纸模糊强度（0~1，0 = 不模糊）。 */
     val wallpaperBlur: Double = SettingsKeys.Defaults.WALLPAPER_BLUR,
+    // ── 语言与外部 Live2D 模型 ──
+    val appLanguage: String = SettingsKeys.Defaults.APP_LANGUAGE,
+    val activeLive2dModelId: String = SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL,
+    val live2dModels: List<Live2dModelSpec> = listOf(Live2dModelStore.BUILT_IN_MODEL),
+    val live2dImporting: Boolean = false,
+    val live2dStatusMessage: String? = null,
+    val live2dErrorMessage: String? = null,
+    // ── Telegram Bot ──
+    val telegramEnabled: Boolean = SettingsKeys.Defaults.TELEGRAM_ENABLED,
+    val telegramBotToken: String = SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN,
+    val telegramChatId: String = SettingsKeys.Defaults.TELEGRAM_CHAT_ID,
+    val telegramTesting: Boolean = false,
+    val telegramTestResult: String? = null,
+    val telegramTestError: String? = null,
     /** 刚执行、仍在撤销窗口内的破坏性操作（null = 无可撤销项）。 */
     val pendingUndo: SettingsUndo? = null
 )
 
 /**
  * 设置页可撤销的破坏性操作。
- *
- * 快照是撤销窗口内唯一的回滚依据；窗口到期后由 ViewModel 丢弃。
- * 壁纸这类「移出配置但文件暂时保留」的操作，到期时才真正清理文件
- * （见 [SettingsViewModel.finalizePending]）。
  */
 sealed interface SettingsUndo : UndoableAction {
-    override val undoLabel: String get() = "撤销"
-
     /** 恢复默认 System Prompt：快照为原提示词。 */
     data class ResetPrompt(
         override val id: Long,
         override val deadlineMs: Long,
-        val previousPrompt: String
-    ) : SettingsUndo {
-        override val message: String get() = "System Prompt 已恢复默认"
-    }
+        val previousPrompt: String,
+        override val message: String = "System Prompt restored to default",
+        override val undoLabel: String = "Undo"
+    ) : SettingsUndo
 
     /** 移除背景壁纸：快照为原路径（文件在窗口内保留，到期才删）。 */
     data class ClearWallpaper(
         override val id: Long,
         override val deadlineMs: Long,
-        val previousPath: String
-    ) : SettingsUndo {
-        override val message: String get() = "背景壁纸已移除"
-    }
+        val previousPath: String,
+        override val message: String = "Wallpaper removed",
+        override val undoLabel: String = "Undo"
+    ) : SettingsUndo
 }
 
 open class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -138,9 +155,17 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
+    private fun localizedCtx(): Context = LocaleHelper.wrap(getApplication())
+
     /** 从内存快照同步读取初始值，保证首帧就是已存设置（供 UI 本地编辑状态取初值）。 */
     private fun initialState(): SettingsUiState {
         val key = settingsManager.getApiKey()
+        val modelStore: Live2dModelStore? = container.live2dModelStore
+        val models = modelStore?.listModels() ?: listOf(Live2dModelStore.BUILT_IN_MODEL)
+        val activeModelId = settingsManager.getActiveLive2dModel() ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
+        val lang = settingsManager.getAppLanguage() ?: LocaleHelper.getLanguage(getApplication())
+        val tgToken = settingsManager.getTelegramBotToken() ?: SettingsKeys.Defaults.TELEGRAM_BOT_TOKEN
+        val tgChatId = settingsManager.getTelegramChatId() ?: SettingsKeys.Defaults.TELEGRAM_CHAT_ID
         return SettingsUiState(
             apiKey = key,
             apiKeyMasked = maskApiKey(key),
@@ -161,7 +186,13 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             chatBubbleAlpha = settingsManager.getChatBubbleAlpha(),
             enableAutoUpdateCheck = settingsManager.isAutoUpdateCheckEnabled(),
             wallpaperPath = settingsManager.getWallpaperPath(),
-            wallpaperBlur = settingsManager.getWallpaperBlur()
+            wallpaperBlur = settingsManager.getWallpaperBlur(),
+            appLanguage = lang,
+            activeLive2dModelId = activeModelId,
+            live2dModels = models,
+            telegramEnabled = settingsManager.isTelegramEnabled(),
+            telegramBotToken = tgToken,
+            telegramChatId = tgChatId
         )
     }
 
@@ -198,6 +229,13 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
         subscribe(settingsManager.wallpaperPathFlow) { s, p -> s.copy(wallpaperPath = p) }
         subscribe(settingsManager.wallpaperBlurFlow) { s, v -> s.copy(wallpaperBlur = v) }
 
+        // 语言、Live2D 模型与 Telegram（可为 null 以兼容现有未 stub 新 Flow 的 Mockito 单测）
+        subscribe(settingsManager.appLanguageFlow) { s, lang -> s.copy(appLanguage = lang) }
+        subscribe(settingsManager.activeLive2dModelFlow) { s, id -> s.copy(activeLive2dModelId = id) }
+        subscribe(settingsManager.telegramEnabledFlow) { s, en -> s.copy(telegramEnabled = en) }
+        subscribe(settingsManager.telegramBotTokenFlow) { s, tok -> s.copy(telegramBotToken = tok) }
+        subscribe(settingsManager.telegramChatIdFlow) { s, cid -> s.copy(telegramChatId = cid) }
+
         // 隐私授权状态（响应式订阅：同意/撤销后 UI 即时反映）
         subscribe(privacyAgreedFlow()) { s, agreed ->
             s.copy(privacyAgreed = agreed)
@@ -209,11 +247,9 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
 
     /**
      * 订阅单个 Flow 并把最新值合入 [SettingsUiState]。
-     *
-     * 统一收起原本 12 个手写 `viewModelScope.launch { flow.collect { _state.update { ... } } }`
-     * 的重复样板。
      */
-    private fun <T> subscribe(flow: Flow<T>, reducer: (SettingsUiState, T) -> SettingsUiState) {
+    private fun <T> subscribe(flow: Flow<T>?, reducer: (SettingsUiState, T) -> SettingsUiState) {
+        if (flow == null) return
         viewModelScope.launch {
             flow.collect { value -> _state.update { reducer(it, value) } }
         }
@@ -283,11 +319,17 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             // 已经就是默认值：没有可撤销的差异（UI 上也把按钮置灰，这里兜底）
             if (current == SettingsKeys.Defaults.SYSTEM_PROMPT) return@launch
             settingsManager.setSystemPrompt(SettingsKeys.Defaults.SYSTEM_PROMPT)
+            val ctx = localizedCtx()
             beginUndo(
                 SettingsUndo.ResetPrompt(
                     id = nextUndoId(),
                     deadlineMs = nextUndoDeadline(),
-                    previousPrompt = current
+                    previousPrompt = current,
+                    message = ctx.getStringOrFallback(
+                        R.string.settings_undo_prompt_reset,
+                        "System Prompt restored to default"
+                    ),
+                    undoLabel = ctx.getStringOrFallback(R.string.action_undo, "Undo")
                 )
             )
         }
@@ -373,13 +415,22 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             it.copy(isCheckingUpdate = true, updateMessage = null, updateReleaseUrl = null)
         }
         checkUpdateJob = viewModelScope.launch {
+            val ctx = localizedCtx()
             val (message, url) = when (val result = updateChecker.check()) {
                 is UpdateCheckResult.UpdateAvailable ->
-                    "发现新版本 v${result.release.versionName}" to result.release.htmlUrl
+                    ctx.getStringOrFallback(
+                        R.string.update_available_notice,
+                        "New version available: v%1\$s",
+                        result.release.versionName
+                    ) to result.release.htmlUrl
                 is UpdateCheckResult.UpToDate ->
-                    "当前已是最新版本（v${result.currentVersion}）" to null
+                    ctx.getStringOrFallback(
+                        R.string.update_up_to_date,
+                        "Already up to date (v%1\$s)",
+                        result.currentVersion
+                    ) to null
                 is UpdateCheckResult.Failed ->
-                    result.message to null
+                    result.localizedMessage(ctx) to null
             }
             _state.update {
                 it.copy(isCheckingUpdate = false, updateMessage = message, updateReleaseUrl = url)
@@ -421,11 +472,17 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             // 本来就没有壁纸：没有可撤销的内容
             if (previousPath.isBlank()) return@launch
             settingsManager.setWallpaperPath("")
+            val ctx = localizedCtx()
             beginUndo(
                 SettingsUndo.ClearWallpaper(
                     id = nextUndoId(),
                     deadlineMs = nextUndoDeadline(),
-                    previousPath = previousPath
+                    previousPath = previousPath,
+                    message = ctx.getStringOrFallback(
+                        R.string.settings_undo_wallpaper_removed,
+                        "Wallpaper removed"
+                    ),
+                    undoLabel = ctx.getStringOrFallback(R.string.action_undo, "Undo")
                 )
             )
         }
@@ -559,9 +616,17 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
      * 再用临时客户端请求 `{base}/models`，避免依赖 lazy 初始化时机。
      */
     fun fetchModels(apiKey: String, apiUrl: String) {
+        val ctx = localizedCtx()
         // 本地模型（Ollama / LM Studio 等）不需要 API Key，允许留空直接拉取
         if (apiUrl.isBlank()) {
-            _state.update { it.copy(modelsError = "请先填写 API 地址") }
+            _state.update {
+                it.copy(
+                    modelsError = ctx.getStringOrFallback(
+                        R.string.provider_error_empty_url,
+                        "Please enter an API URL first"
+                    )
+                )
+            }
             return
         }
         viewModelScope.launch {
@@ -597,7 +662,10 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
                             it.copy(
                                 availableModels = emptyList(),
                                 isLoadingModels = false,
-                                modelsError = "接口未返回任何模型"
+                                modelsError = ctx.getStringOrFallback(
+                                    R.string.provider_error_no_models,
+                                    "The endpoint did not return any models"
+                                )
                             )
                         }
                     } else {
@@ -612,9 +680,11 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
                 },
                 onFailure = { e ->
                     val message = when (e) {
-                        // ApiException.message 已是友好提示（401 → 提示填 Key）
-                        is ApiException -> e.message
-                        else -> e.message?.takeIf { it.isNotBlank() } ?: "获取模型列表失败"
+                        is ApiException -> e.localizedMessage(ctx)
+                        else -> e.message?.takeIf { it.isNotBlank() } ?: ctx.getStringOrFallback(
+                            R.string.provider_error_fetch_failed,
+                            "Failed to fetch model list"
+                        )
                     }
                     _state.update {
                         it.copy(
@@ -637,6 +707,203 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
 
     fun dismissModelsError() {
         _state.update { it.copy(modelsError = null) }
+    }
+
+    // ── 语言、Live2D 外部模型 & Telegram Bot ────────────────
+
+    fun updateAppLanguage(languageCode: String) {
+        viewModelScope.launch {
+            settingsManager.setAppLanguage(languageCode)
+            _state.update { it.copy(appLanguage = languageCode) }
+        }
+    }
+
+    fun selectLive2dModel(id: String) {
+        viewModelScope.launch {
+            settingsManager.setActiveLive2dModel(id)
+            _state.update { it.copy(activeLive2dModelId = id) }
+        }
+    }
+
+    fun importLive2dModelZip(uri: Uri) {
+        val modelStore: Live2dModelStore = container.live2dModelStore ?: return
+        if (_state.value.live2dImporting) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(live2dImporting = true, live2dStatusMessage = null, live2dErrorMessage = null)
+            }
+            val ctx = localizedCtx()
+            when (val res = modelStore.importFromZip(uri)) {
+                is Live2dImportResult.Success -> {
+                    val models = modelStore.listModels()
+                    settingsManager.setActiveLive2dModel(res.spec.id)
+                    _state.update {
+                        it.copy(
+                            live2dImporting = false,
+                            live2dModels = models,
+                            activeLive2dModelId = res.spec.id,
+                            live2dStatusMessage = ctx.getStringOrFallback(
+                                R.string.live2d_import_success,
+                                "Model \"%1\$s\" imported and activated",
+                                res.spec.displayName
+                            )
+                        )
+                    }
+                }
+                Live2dImportResult.CannotReadFile -> _state.update {
+                    it.copy(
+                        live2dImporting = false,
+                        live2dErrorMessage = ctx.getStringOrFallback(
+                            R.string.live2d_import_error_open,
+                            "Unable to read the selected file"
+                        )
+                    )
+                }
+                Live2dImportResult.EmptyArchive -> _state.update {
+                    it.copy(
+                        live2dImporting = false,
+                        live2dErrorMessage = ctx.getStringOrFallback(
+                            R.string.live2d_import_error_empty,
+                            "The .zip archive is empty or invalid"
+                        )
+                    )
+                }
+                Live2dImportResult.MissingModel3Json -> _state.update {
+                    it.copy(
+                        live2dImporting = false,
+                        live2dErrorMessage = ctx.getStringOrFallback(
+                            R.string.live2d_import_error_no_model3,
+                            "No .model3.json file found inside the .zip archive"
+                        )
+                    )
+                }
+                Live2dImportResult.MissingMoc3 -> _state.update {
+                    it.copy(
+                        live2dImporting = false,
+                        live2dErrorMessage = ctx.getStringOrFallback(
+                            R.string.live2d_import_error_no_moc,
+                            "Missing .moc3 model data referenced by model3.json"
+                        )
+                    )
+                }
+                is Live2dImportResult.Failed -> _state.update {
+                    it.copy(
+                        live2dImporting = false,
+                        live2dErrorMessage = res.detail?.takeIf { d -> d.isNotBlank() } ?: ctx.getStringOrFallback(
+                            R.string.live2d_import_error_failed,
+                            "Failed to import Live2D model"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteLive2dModel(id: String) {
+        val modelStore: Live2dModelStore = container.live2dModelStore ?: return
+        if (id.isBlank()) return
+        viewModelScope.launch {
+            withContext(ioDispatcher) { modelStore.deleteModel(id) }
+            val remaining = modelStore.listModels()
+            val nextActive = if (_state.value.activeLive2dModelId == id) {
+                settingsManager.setActiveLive2dModel(SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL)
+                SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
+            } else {
+                _state.value.activeLive2dModelId
+            }
+            _state.update {
+                it.copy(
+                    live2dModels = remaining,
+                    activeLive2dModelId = nextActive,
+                    live2dStatusMessage = null,
+                    live2dErrorMessage = null
+                )
+            }
+        }
+    }
+
+    fun dismissLive2dFeedback() {
+        _state.update { it.copy(live2dStatusMessage = null, live2dErrorMessage = null) }
+    }
+
+    fun updateTelegramEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsManager.setTelegramEnabled(enabled) }
+    }
+
+    fun saveTelegramBotToken(token: String) {
+        viewModelScope.launch {
+            val trimmed = token.trim()
+            if (trimmed == settingsManager.getTelegramBotToken()) return@launch
+            settingsManager.setTelegramBotToken(trimmed)
+        }
+    }
+
+    fun saveTelegramChatId(chatId: String) {
+        viewModelScope.launch {
+            val trimmed = chatId.trim()
+            if (trimmed == settingsManager.getTelegramChatId()) return@launch
+            settingsManager.setTelegramChatId(trimmed)
+        }
+    }
+
+    fun testTelegramConnection(token: String) {
+        val ctx = localizedCtx()
+        val trimmed = token.trim()
+        if (trimmed.isEmpty()) {
+            _state.update {
+                it.copy(
+                    telegramTestResult = null,
+                    telegramTestError = ctx.getStringOrFallback(
+                        R.string.telegram_error_empty_token,
+                        "Please enter a Telegram Bot Token first"
+                    )
+                )
+            }
+            return
+        }
+        val client: TelegramBotClient = container.telegramBotClient ?: return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(telegramTesting = true, telegramTestResult = null, telegramTestError = null)
+            }
+            if (trimmed != settingsManager.getTelegramBotToken()) {
+                settingsManager.setTelegramBotToken(trimmed)
+            }
+            val res = client.getMe(trimmed)
+            res.fold(
+                onSuccess = { info ->
+                    val label = info.username?.takeIf { u -> u.isNotBlank() } ?: info.firstName
+                    _state.update {
+                        it.copy(
+                            telegramTesting = false,
+                            telegramTestResult = ctx.getStringOrFallback(
+                                R.string.telegram_connected_as,
+                                "Connected: @%1\$s (%2\$s)",
+                                label,
+                                info.id.toString()
+                            ),
+                            telegramTestError = null
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _state.update {
+                        it.copy(
+                            telegramTesting = false,
+                            telegramTestResult = null,
+                            telegramTestError = e.message?.takeIf { m -> m.isNotBlank() } ?: ctx.getStringOrFallback(
+                                R.string.telegram_error_unknown,
+                                "Telegram connection failed"
+                            )
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun dismissTelegramFeedback() {
+        _state.update { it.copy(telegramTestResult = null, telegramTestError = null) }
     }
 
     // ── 日志导出 ──────────────────────────────────────

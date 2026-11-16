@@ -1,7 +1,10 @@
 package com.meapet.mobile.update
 
+import android.content.Context
 import android.util.Log
+import com.meapet.mobile.R
 import com.meapet.mobile.client.HttpClientEngine
+import com.meapet.mobile.core.getStringOrFallback
 import com.meapet.mobile.core.runCatchingLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -45,16 +48,26 @@ class UpdateChecker(
                 )
             )
             if (response.statusCode == 404) {
-                return UpdateCheckResult.Failed("尚未发布正式版本")
+                return UpdateCheckResult.Failed(
+                    message = "No official release published yet",
+                    reason = UpdateErrorReason.NO_RELEASE
+                )
             }
             if (response.statusCode !in 200..299) {
-                return UpdateCheckResult.Failed("检测失败（HTTP ${response.statusCode}）")
+                return UpdateCheckResult.Failed(
+                    message = "Check failed (HTTP ${response.statusCode})",
+                    reason = UpdateErrorReason.HTTP,
+                    httpStatus = response.statusCode
+                )
             }
             // JSON 解析（首次还含 JsonElement 等类初始化）挪到后台：check() 的调用方
             // 常在 Dispatchers.Main 上（启动时静默检测），别让解析占用主线程。
             val release = withContext(Dispatchers.Default) {
                 parseRelease(response.bodyAsText())
-            } ?: return UpdateCheckResult.Failed("解析版本信息失败")
+            } ?: return UpdateCheckResult.Failed(
+                message = "Failed to parse release info",
+                reason = UpdateErrorReason.PARSE
+            )
             if (isNewer(release.versionName, current)) {
                 UpdateCheckResult.UpdateAvailable(release = release, currentVersion = current)
             } else {
@@ -64,7 +77,10 @@ class UpdateChecker(
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "update check failed: ${e.message}")
-            UpdateCheckResult.Failed(e.message ?: "网络异常，检测失败")
+            UpdateCheckResult.Failed(
+                message = e.message ?: "Network error, check failed",
+                reason = UpdateErrorReason.NETWORK
+            )
         }
     }
 
@@ -143,6 +159,13 @@ data class AppRelease(
     val body: String? = null
 )
 
+enum class UpdateErrorReason {
+    NO_RELEASE,
+    HTTP,
+    PARSE,
+    NETWORK
+}
+
 /** 检测更新结果。 */
 sealed interface UpdateCheckResult {
     data class UpdateAvailable(
@@ -152,5 +175,33 @@ sealed interface UpdateCheckResult {
 
     data class UpToDate(val currentVersion: String) : UpdateCheckResult
 
-    data class Failed(val message: String) : UpdateCheckResult
+    data class Failed(
+        val message: String,
+        val reason: UpdateErrorReason = UpdateErrorReason.NETWORK,
+        val httpStatus: Int = 0
+    ) : UpdateCheckResult {
+        fun localizedMessage(context: Context): String = when (reason) {
+            UpdateErrorReason.NO_RELEASE -> context.getStringOrFallback(
+                R.string.update_error_no_release,
+                "No official release published yet"
+            )
+            UpdateErrorReason.HTTP -> context.getStringOrFallback(
+                R.string.update_error_http,
+                "Check failed (HTTP %1\$d)",
+                httpStatus
+            )
+            UpdateErrorReason.PARSE -> context.getStringOrFallback(
+                R.string.update_error_parse,
+                "Failed to parse release info"
+            )
+            UpdateErrorReason.NETWORK -> if (message.isNotBlank() && message != "Network error, check failed") {
+                message
+            } else {
+                context.getStringOrFallback(
+                    R.string.update_error_network,
+                    "Network error, check failed"
+                )
+            }
+        }
+    }
 }

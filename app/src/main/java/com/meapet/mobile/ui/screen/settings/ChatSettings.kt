@@ -12,7 +12,9 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.meapet.mobile.R
 import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.viewmodel.SettingsUiState
 import com.meapet.mobile.viewmodel.SettingsViewModel
@@ -21,18 +23,12 @@ import com.meapet.mobile.viewmodel.SettingsViewModel
 //  对话：System Prompt 与记忆系统
 // ═══════════════════════════════════════════════════
 
-/**
- * System Prompt 编辑区。
- *
- * 「恢复默认」立即生效（本地编辑态 + 落盘），随后由设置页的撤销条给一次反悔机会：
- * 撤销条是页面级能力，不属于这个叶子组件。
- */
 @Composable
 internal fun SystemPromptSection(
     viewModel: SettingsViewModel,
     local: SettingsLocalState
 ) {
-    SectionTitle("System Prompt")
+    SectionTitle(stringResource(R.string.chat_settings_system_prompt))
 
     Column {
         OutlinedTextField(
@@ -47,9 +43,6 @@ internal fun SystemPromptSection(
 
         Spacer(Modifier.height(8.dp))
 
-        // 恢复默认：先改本地编辑态让文本框立刻变化，再异步落盘并开撤销窗口。
-        // 快照由 ViewModel 从传入的旧文本取——用户可能改完还没失焦保存，
-        // 用 DataStore 里的值当快照会把眼前内容丢掉。
         val isDefault = local.systemPrompt == SettingsKeys.Defaults.SYSTEM_PROMPT
         OutlinedButton(
             onClick = {
@@ -57,20 +50,17 @@ internal fun SystemPromptSection(
                 local.systemPrompt = SettingsKeys.Defaults.SYSTEM_PROMPT
                 viewModel.resetSystemPrompt(previous)
             },
-            // 已是默认值就置灰：没有可重置的内容（与背景壁纸的「恢复默认」一致）
             enabled = !isDefault,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "恢复默认",
+                text = stringResource(R.string.action_restore_default),
                 color = MaterialTheme.colorScheme.primary
             )
         }
     }
 }
 
-
-/** 记忆系统：开关 + 摘要轮次滑杆。 */
 @Composable
 internal fun MemorySection(
     state: SettingsUiState,
@@ -78,18 +68,18 @@ internal fun MemorySection(
     local: SettingsLocalState,
     darkTheme: Boolean
 ) {
-    SectionTitle("记忆系统")
+    SectionTitle(stringResource(R.string.chat_settings_memory_system))
 
     SettingsSwitchRow(
-        label = "启用记忆",
-        description = "保留对话中提取的重要信息",
+        label = stringResource(R.string.chat_settings_enable_memory),
+        description = stringResource(R.string.chat_settings_enable_memory_desc),
         checked = state.enableMemory,
         darkTheme = darkTheme,
         onCheckedChange = { viewModel.updateEnableMemory(it) }
     )
     SettingsSwitchRow(
-        label = "自动摘要",
-        description = "定期总结对话为长期记忆",
+        label = stringResource(R.string.chat_settings_auto_summary),
+        description = stringResource(R.string.chat_settings_auto_summary_desc),
         checked = state.enableAutoSummary,
         darkTheme = darkTheme,
         onCheckedChange = { viewModel.updateEnableAutoSummary(it) }
@@ -98,7 +88,7 @@ internal fun MemorySection(
     Spacer(Modifier.height(8.dp))
 
     Text(
-        text = "摘要轮次: 每 ${local.summaryInterval.toInt()} 轮对话总结一次",
+        text = stringResource(R.string.chat_settings_summary_interval, local.summaryInterval.toInt()),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
             alpha = if (state.enableAutoSummary) 1f else 0.5f

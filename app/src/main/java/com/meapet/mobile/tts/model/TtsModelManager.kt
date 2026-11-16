@@ -3,6 +3,9 @@ package com.meapet.mobile.tts.model
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.meapet.mobile.R
+import com.meapet.mobile.core.LocaleHelper
+import com.meapet.mobile.core.getStringOrFallback
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -142,8 +145,11 @@ class TtsModelManager(private val context: Context) {
             return@withContext
         }
         try {
+            val localizedCtx = LocaleHelper.wrap(context)
             if (files.isEmpty()) {
-                _state.value = TtsModelState.Error("未配置模型下载地址")
+                _state.value = TtsModelState.Error(
+                    localizedCtx.getStringOrFallback(R.string.tts_error_no_url, "Model download URL not configured")
+                )
                 return@withContext
             }
             modelDir.mkdirs()
@@ -173,13 +179,20 @@ class TtsModelManager(private val context: Context) {
                 }
                 refreshState()
                 if (_state.value != TtsModelState.Ready) {
-                    _state.value = TtsModelState.Error("下载完成但文件不完整")
+                    _state.value = TtsModelState.Error(
+                        localizedCtx.getStringOrFallback(
+                            R.string.tts_error_incomplete_download,
+                            "Download completed but files are incomplete"
+                        )
+                    )
                 } else {
                     Log.i(TAG, "模型下载完成，共 ${files.size} 个文件")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "模型下载失败", e)
-                _state.value = TtsModelState.Error(e.message ?: "下载失败")
+                _state.value = TtsModelState.Error(
+                    e.message ?: localizedCtx.getStringOrFallback(R.string.tts_error_download_failed, "Download failed")
+                )
             }
         } finally {
             // tryLock 成功才走到这里；unlock 需持有锁（协程 Mutex 不绑定线程）
@@ -238,12 +251,16 @@ class TtsModelManager(private val context: Context) {
      */
     suspend fun importFromZip(uri: Uri): Result<String> = withContext(Dispatchers.IO) {
         _state.value = TtsModelState.Importing
+        val localizedCtx = LocaleHelper.wrap(context)
         try {
             val resolver = context.contentResolver
             val stream = resolver.openInputStream(uri)
                 ?: run {
                     // 早退必须落 Error，否则 UI 会一直停在 Importing 转圈
-                    val msg = "无法读取所选文件"
+                    val msg = localizedCtx.getStringOrFallback(
+                        R.string.tts_error_cannot_read_file,
+                        "Unable to read selected file"
+                    )
                     _state.value = TtsModelState.Error(msg)
                     return@withContext Result.failure(IllegalStateException(msg))
                 }
@@ -259,13 +276,21 @@ class TtsModelManager(private val context: Context) {
                 }
             }
             if (entries.isEmpty()) {
-                val msg = "zip 为空或无法解析"
+                val msg = localizedCtx.getStringOrFallback(
+                    R.string.tts_error_empty_zip,
+                    "Zip archive is empty or unreadable"
+                )
                 _state.value = TtsModelState.Error(msg)
                 return@withContext Result.failure(IllegalStateException(msg))
             }
             val mapping = resolveModelEntries(entries)
                 ?: run {
-                    val msg = "资源包缺少模型文件（需要 ${REQUIRED_MODEL_FILES.joinToString("、")}）"
+                    val requiredList = REQUIRED_MODEL_FILES.joinToString(", ")
+                    val msg = localizedCtx.getStringOrFallback(
+                        R.string.tts_error_missing_files,
+                        "Archive is missing required files (%1\$s)",
+                        requiredList
+                    )
                     _state.value = TtsModelState.Error(msg)
                     return@withContext Result.failure(IllegalStateException(msg))
                 }
@@ -289,15 +314,22 @@ class TtsModelManager(private val context: Context) {
             refreshState()
             if (_state.value == TtsModelState.Ready) {
                 Log.i(TAG, "zip 导入完成：${byEntry.size} 个文件")
-                Result.success("导入成功")
+                Result.success(
+                    localizedCtx.getStringOrFallback(R.string.tts_import_success, "Import succeeded")
+                )
             } else {
-                val msg = "导入失败：文件不完整或大小不符"
+                val msg = localizedCtx.getStringOrFallback(
+                    R.string.tts_error_incomplete_import,
+                    "Import failed: incomplete files or size mismatch"
+                )
                 _state.value = TtsModelState.Error(msg)
                 Result.failure(IllegalStateException(msg))
             }
         } catch (e: Exception) {
             Log.e(TAG, "zip 导入失败", e)
-            _state.value = TtsModelState.Error(e.message ?: "导入失败")
+            _state.value = TtsModelState.Error(
+                e.message ?: localizedCtx.getStringOrFallback(R.string.tts_error_import_failed, "Import failed")
+            )
             Result.failure(e)
         }
     }

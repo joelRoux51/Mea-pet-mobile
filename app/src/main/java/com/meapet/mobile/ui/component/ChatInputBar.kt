@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.meapet.mobile.R
@@ -46,7 +47,7 @@ fun ChatInputBar(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     isLoading: Boolean = false,
-    placeholder: String = "给 Mea 发个消息...",
+    placeholder: String = stringResource(R.string.chat_input_placeholder),
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -125,7 +126,7 @@ fun ChatInputBar(
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_send),
-                        contentDescription = "发送",
+                        contentDescription = stringResource(R.string.action_send),
                         modifier = Modifier.size(20.dp)
                     )
                 }

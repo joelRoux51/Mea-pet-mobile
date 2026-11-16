@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.meapet.mobile.R
 
 /**
  * 隐私政策授权弹窗。
@@ -87,7 +89,10 @@ fun PrivacyDialog(
             Column(modifier = Modifier.padding(20.dp)) {
                 // ── 标题 ──
                 Text(
-                    text = if (showFullPolicy) "隐私政策" else "隐私政策与数据采集",
+                    text = stringResource(
+                        if (showFullPolicy) R.string.privacy_dialog_title_policy
+                        else R.string.privacy_dialog_title_consent
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -115,29 +120,32 @@ fun PrivacyDialog(
                             PrivacyPolicyContent()
                         } else {
                             Text(
-                                text = "欢迎使用 MeaPet！",
+                                text = stringResource(R.string.privacy_welcome),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "本应用集成了友盟+ 统计 SDK，用于收集去标识化的使用数据（启动次数、使用时长等），以帮助改进产品质量。SDK 会采集设备标识符和网络信息。",
+                                text = stringResource(R.string.privacy_summary_body),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(8.dp))
+                            val prefix = stringResource(R.string.privacy_read_full_prefix)
+                            val link = stringResource(R.string.privacy_read_full_link)
+                            val suffix = stringResource(R.string.privacy_read_full_suffix)
                             Text(
                                 text = buildAnnotatedString {
-                                    append("你可以查看完整的")
+                                    append(prefix)
                                     withStyle(
                                         SpanStyle(
                                             color = MaterialTheme.colorScheme.primary,
                                             textDecoration = TextDecoration.Underline
                                         )
                                     ) {
-                                        append("《隐私政策》")
+                                        append(link)
                                     }
-                                    append("了解详情。")
+                                    append(suffix)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier
@@ -146,7 +154,7 @@ fun PrivacyDialog(
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "• 同意：开始采集去标识化的统计数据\n• 不同意：不采集任何数据，App 其余功能不受影响\n• 你可以随时在设置中取消授权（取消后 App 将自动退出）",
+                                text = stringResource(R.string.privacy_bullets),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -173,20 +181,20 @@ fun PrivacyDialog(
                     if (showFullPolicy) {
                         Box(Modifier.weight(1f)) // 占位，让返回按钮居右
                         TextButton(onClick = { showFullPolicy = false }) {
-                            Text("返回")
+                            Text(stringResource(R.string.action_back))
                         }
                     } else {
                         Row {
                             TextButton(onClick = { showFullPolicy = true }) {
-                                Text("查看隐私政策")
+                                Text(stringResource(R.string.privacy_btn_view_policy))
                             }
                             Spacer(Modifier.width(5.dp))
                             TextButton(onClick = onDisagree) {
-                                Text("不同意")
+                                Text(stringResource(R.string.privacy_btn_disagree))
                             }
                         }
                         TextButton(onClick = onAgree) {
-                            Text("同意并继续")
+                            Text(stringResource(R.string.privacy_btn_agree))
                         }
                     }
                 }

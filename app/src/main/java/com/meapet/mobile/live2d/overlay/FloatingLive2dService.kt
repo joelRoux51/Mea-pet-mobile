@@ -16,8 +16,11 @@ import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import com.meapet.mobile.R
 import com.meapet.mobile.app.MeaPetApplication
+import com.meapet.mobile.core.LocaleHelper
 import com.meapet.mobile.live2d.Live2dDelegate
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dRenderState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +107,10 @@ class FloatingLive2dService : Service() {
         )
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         // shuttingDown 是共享 StateFlow（全局），上次关闭时置位过；新 Service 必须重置，
@@ -135,11 +142,24 @@ class FloatingLive2dService : Service() {
      * 预热是毫秒级的 IO，这里只挂起协程等待，不阻塞主线程。
      */
     private fun createFloatingWindowWithPalette() {
-        val settings = (application as? MeaPetApplication)?.container?.settingsManager
+        val container = (application as? MeaPetApplication)?.container
+        val settings = container?.settingsManager
         serviceScope.launch {
             settings?.awaitLoaded()
+            if (container != null && settings != null) {
+                val activeSpec = container.live2dModelStore.findById(settings.getActiveLive2dModel())
+                Live2dManager.getInstance().setActiveModel(activeSpec)
+            }
             createFloatingWindow()
             initOverlayWindows()
+            // 监听 Telegram Bot 推送消息，在悬浮窗人物旁弹出对话气泡
+            if (container != null) {
+                serviceScope.launch {
+                    container.telegramPoller.events.collect { event ->
+                        bubbleWindow?.addBubble("[Telegram · ${event.sender}]\n${event.text}")
+                    }
+                }
+            }
         }
     }
 
@@ -201,8 +221,10 @@ class FloatingLive2dService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "Live2D Overlay", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "Shows Live2D model floating over other apps" }
+                CHANNEL_ID,
+                getString(R.string.overlay_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { description = getString(R.string.overlay_channel_desc) }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
@@ -215,8 +237,8 @@ class FloatingLive2dService : Service() {
             Notification.Builder(this)
         }
         return builder
-            .setContentTitle("Live2D Overlay")
-            .setContentText("Double-tap for menu · Drag to move · Pinch to resize")
+            .setContentTitle(getString(R.string.overlay_notif_title))
+            .setContentText(getString(R.string.overlay_notif_text))
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .build()
@@ -402,7 +424,8 @@ class FloatingLive2dService : Service() {
                 },
                 onFailure = { e ->
                     Log.w(TAG, "Overlay send failed: ${e.message}")
-                    bubbleWindow?.addBubble("发送失败：${e.message ?: "未知错误"}")
+                    val errText = e.message ?: getString(R.string.overlay_unknown_error)
+                    bubbleWindow?.addBubble(getString(R.string.overlay_send_failed, errText))
                 }
             )
         }

@@ -47,45 +47,69 @@ class Live2dManager private constructor() {
     var model: Live2dModel? = null
         private set
 
+    @Volatile
+    var activeSpec: Live2dModelSpec = Live2dModelStore.BUILT_IN_MODEL
+        private set
+
+    @Volatile
+    private var loadedSpec: Live2dModelSpec? = null
+
     private var modelLoaded = false
 
     private val projection = CubismMatrix44.create()
 
-    /** 在 GL 上下文重建时强制重新加载模型（旧上下文的纹理已失效）。 */
+    fun setActiveModel(spec: Live2dModelSpec): Boolean {
+        if (spec == activeSpec) return false
+        activeSpec = spec
+        Live2dPal.clearByteCache()
+        return true
+    }
+
+    /** 在 GL 上下文重建或切模型时强制重新加载模型。 */
     fun resetModel() {
         modelLoaded = false
+        loadedSpec = null
         model?.deleteModel()
         model = null
         loadModel()
     }
 
     fun loadModel() {
-        if (modelLoaded) return
-        val dir = "$MODEL_DIR_NAME/"
-        Log.d(TAG, "Loading model from: $dir$MODEL_JSON_NAME")
+        val spec = activeSpec
+        if (modelLoaded && loadedSpec == spec) return
+        val dir = spec.dirPath
+        Log.d(TAG, "Loading model from: $dir${spec.modelJsonName}")
         try {
             val m = Live2dModel(dir)
-            m.loadAssets(dir, MODEL_JSON_NAME)
+            m.loadAssets(dir, spec.modelJsonName)
             model = m
+            loadedSpec = spec
             modelLoaded = true
-            Log.d(TAG, "Model loaded successfully")
+            Log.d(TAG, "Model loaded successfully: ${spec.displayName}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load model", e)
+            Log.e(TAG, "Failed to load model: ${spec.displayName}", e)
+            // Fall back to built-in model if external model failed to load
+            if (!spec.isBuiltIn) {
+                activeSpec = Live2dModelStore.BUILT_IN_MODEL
+                loadedSpec = null
+                modelLoaded = false
+                loadModel()
+            }
         }
     }
 
     /**
      * 启动时异步预热模型文件到内存缓存（IO 线程）。
-     *
-     * [loadModel] 在 GL 线程同步执行（onSurfaceCreated），asset 读取是最大耗时来源，
-     * 会拖住 GL 线程 → 主线程 `GLSurfaceView.onPause` 等待数秒。预热后 [Live2dPal.loadFileAsBytes]
-     * 命中缓存，GL 线程只做解析 + GL 上传，启动/切前后台不再长时间阻塞。
      */
     fun prewarmModel(context: android.content.Context) {
-        Live2dPal.prewarmDirectory(context, MODEL_DIR_NAME)
+        Live2dPal.prewarmDirectory(context, activeSpec.dirPath)
     }
 
     fun onUpdate() {
+        if (modelLoaded && loadedSpec != activeSpec) {
+            Live2dDelegate.getInstance().textureManager.releaseInvalidTextures()
+            resetModel()
+        }
         val m = model ?: return
         val delegate = Live2dDelegate.getInstance()
         val width = delegate.windowWidth

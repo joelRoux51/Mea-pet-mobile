@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MeaPet</string>
+
+    <!-- 通用操作 -->
+    <string name="action_back">返回</string>
+    <string name="action_close">关闭</string>
+    <string name="action_send">发送</string>
+    <string name="action_retry">重试</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_clear_all">清除全部</string>
+    <string name="action_undo">撤销</string>
+    <string name="action_got_it">知道了</string>
+    <string name="action_view">查看</string>
+    <string name="action_restore_default">恢复默认</string>
+    <string name="action_show">显示</string>
+    <string name="action_hide">隐藏</string>
+    <string name="action_selected">已选中</string>
+    <string name="action_drag">拖动</string>
+
+    <!-- 聊天界面 -->
+    <string name="chat_empty_hint">开始和 Mea 对话吧！\n发送一条消息开始聊天 🐾</string>
+    <string name="chat_thinking">Mea 正在思考...</string>
+    <string name="chat_input_placeholder">给 Mea 发个消息...</string>
+    <string name="chat_streaming_typing">正在输入...</string>
+    <string name="chat_send_failed_title">发送失败</string>
+    <string name="chat_send_failed_default">发送失败，请检查网络和 API Key</string>
+    <string name="chat_retry_failed_default">重试失败</string>
+    <string name="chat_cleared_conversation">已清除 %1$d 条对话</string>
+    <string name="chat_cleared_memories">已清除 %1$d 条记忆</string>
+    <string name="chat_api_empty_reply">API 响应中没有有效的回复内容</string>
+    <string name="chat_telegram_badge">Telegram</string>
+    <string name="chat_dialogue_dismiss">关闭</string>
+
+    <!-- 顶部菜单 -->
+    <string name="menu_more_options">更多选项</string>
+    <string name="menu_settings">设置</string>
+    <string name="menu_clear_conversation">清除对话</string>
+    <string name="menu_view_memories">查看记忆</string>
+    <string name="menu_overlay">悬浮窗</string>
+    <string name="tts_unmute_session">开启本次语音</string>
+    <string name="tts_mute_session">关闭本次语音</string>
+
+    <!-- 记忆对话框 -->
+    <string name="memory_dialog_title">Mea 的记忆</string>
+    <string name="memory_stats_summary">共 %1$d 条 · 短期 %2$d · 长期 %3$d · 事实 %4$d</string>
+    <string name="memory_disabled_hint">记忆功能已关闭（可在设置中开启）</string>
+    <string name="memory_empty_hint">还没有记忆喵~\n多和 Mea 聊聊天吧</string>
+    <string name="memory_importance">重要性 %1$d%%</string>
+    <string name="memory_keywords">关键词: %1$s</string>
+    <string name="memory_type_short_term">短期</string>
+    <string name="memory_type_long_term">长期</string>
+    <string name="memory_type_core_trait">特质</string>
+    <string name="memory_type_factual">事实</string>
+
+    <!-- 设置导航与摘要 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_provider">提供商</string>
+    <string name="settings_chat">对话</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_voice">语音</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_privacy_policy">隐私政策</string>
+    <string name="settings_summary_no_model">未设置模型</string>
+    <string name="settings_summary_chat_on">System Prompt、记忆已开启</string>
+    <string name="settings_summary_chat_off">System Prompt、记忆已关闭</string>
+    <string name="settings_summary_voice_on">发声已开启</string>
+    <string name="settings_summary_voice_off">发声已关闭</string>
+    <string name="settings_summary_about_default">版本信息、隐私政策</string>
+    <string name="settings_summary_about_version">版本 %1$s</string>
+    <string name="settings_summary_dynamic_color">动态取色</string>
+    <string name="settings_help_suffix">%1$s 说明</string>
+    <string name="settings_undo_prompt_reset">System Prompt 已恢复默认</string>
+    <string name="settings_undo_wallpaper_removed">背景壁纸已移除</string>
+
+    <!-- 提供商与 Telegram Bot -->
+    <string name="provider_api_config">API 配置</string>
+    <string name="provider_api_hint">需要一个 OpenAI 兼容的 API 端点</string>
+    <string name="provider_api_key">API Key</string>
+    <string name="provider_api_url">API 地址</string>
+    <string name="provider_model_params">模型参数</string>
+    <string name="provider_model">模型</string>
+    <string name="provider_fetch_models">获取模型列表</string>
+    <string name="provider_fetching_models">获取中…</string>
+    <string name="provider_models_count">共 %1$d 个模型，点选填入上方</string>
+    <string name="provider_error_empty_url">请先填写 API 地址</string>
+    <string name="provider_error_no_models">接口未返回任何模型</string>
+    <string name="provider_error_fetch_failed">获取模型列表失败</string>
+    <string name="provider_temperature_label">Temperature: %1$s</string>
+    <string name="provider_temperature_help_title">Temperature（随机度）</string>
+    <string name="provider_temperature_help_text">决定回复的随机程度。数值越低，模型越倾向挑高概率的词，回答更稳定、更贴合设定；越高则用词更多样、更有意外感，但也更容易偏题或前后矛盾。\n\n桌宠闲聊建议 0.8~1.2；需要它严格听指令时降到 0.3 以下。\n\n注意：设为 0 也不保证每次输出完全一致；部分提供商上限为 1.0，推理模型会忽略此参数。</string>
+    <string name="provider_max_tokens">最大 Token: %1$d</string>
+
+    <string name="telegram_section_title">Telegram 机器人</string>
+    <string name="telegram_enable_label">启用 Telegram Bot</string>
+    <string name="telegram_enable_desc">接收来自 Telegram 机器人的推送通知、角色对话气泡及聊天消息</string>
+    <string name="telegram_bot_token">Bot Token</string>
+    <string name="telegram_bot_token_placeholder">123456:ABC-DEF…</string>
+    <string name="telegram_chat_id">Chat ID（可选过滤）</string>
+    <string name="telegram_chat_id_placeholder">留空表示接收全部对话</string>
+    <string name="telegram_test_connection">测试机器人连接</string>
+    <string name="telegram_testing">连接中…</string>
+    <string name="telegram_connected_as">已连接：@%1$s (%2$s)</string>
+    <string name="telegram_error_empty_token">请先填写 Telegram Bot Token</string>
+    <string name="telegram_error_unknown">Telegram 连接失败</string>
+    <string name="telegram_notif_permission_btn">授予通知权限</string>
+    <string name="telegram_notif_channel_name">Telegram 消息</string>
+    <string name="telegram_notif_channel_desc">来自 Telegram 机器人的消息推送通知</string>
+    <string name="telegram_notif_default_sender">Telegram 机器人</string>
+
+    <!-- 对话与记忆设置 -->
+    <string name="chat_settings_system_prompt">System Prompt</string>
+    <string name="chat_settings_memory_system">记忆系统</string>
+    <string name="chat_settings_enable_memory">启用记忆</string>
+    <string name="chat_settings_enable_memory_desc">保留对话中提取的重要信息</string>
+    <string name="chat_settings_auto_summary">自动摘要</string>
+    <string name="chat_settings_auto_summary_desc">定期总结对话为长期记忆</string>
+    <string name="chat_settings_summary_interval">摘要轮次: 每 %1$d 轮对话总结一次</string>
+
+    <!-- 外观、语言与 Live2D 模型 -->
+    <string name="language_section_title">语言</string>
+    <string name="language_label">应用语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_fr">Français</string>
+    <string name="language_en">English</string>
+    <string name="language_es">Español</string>
+    <string name="language_zh">中文</string>
+
+    <string name="live2d_section_title">Live2D 模型</string>
+    <string name="live2d_section_desc">切换角色模型或直接导入外部 Cubism 模型（.zip），无需重新编译</string>
+    <string name="live2d_builtin_name">Mea（内置模型）</string>
+    <string name="live2d_import_zip">导入 .zip 模型</string>
+    <string name="live2d_importing">正在导入模型…</string>
+    <string name="live2d_active_badge">使用中</string>
+    <string name="live2d_import_success">模型「%1$s」已导入并切换</string>
+    <string name="live2d_import_error_open">无法读取所选文件</string>
+    <string name="live2d_import_error_empty">zip 压缩包为空或无法解析</string>
+    <string name="live2d_import_error_no_model3">压缩包中未找到 .model3.json 文件</string>
+    <string name="live2d_import_error_no_moc">缺少 model3.json 引用的 .moc3 文件</string>
+    <string name="live2d_import_error_failed">导入 Live2D 模型失败</string>
+
+    <string name="wallpaper_section_title">背景壁纸</string>
+    <string name="wallpaper_section_desc">从相册选一张图片作为主界面聊天背景，实时生效</string>
+    <string name="wallpaper_preview_cd">当前壁纸</string>
+    <string name="wallpaper_default_solid">当前为默认纯色背景</string>
+    <string name="wallpaper_pick_gallery">从相册选择</string>
+    <string name="wallpaper_blur_label">背景模糊: %1$d%%</string>
+    <string name="chat_bubble_alpha_label">聊天气泡透明度: %1$d%%</string>
+    <string name="theme_section_title">主题</string>
+    <string name="theme_mode_label">主题模式</string>
+    <string name="theme_mode_system">跟随系统</string>
+    <string name="theme_mode_light">浅色</string>
+    <string name="theme_mode_dark">深色</string>
+    <string name="theme_dynamic_color">使用系统动态颜色</string>
+    <string name="theme_dynamic_color_on_desc">关闭后可选择预设主题色</string>
+    <string name="theme_dynamic_color_off_desc">当前系统不支持动态颜色</string>
+    <string name="theme_presets_label">主题色预设</string>
+
+    <string name="preset_default">紫罗兰</string>
+    <string name="preset_ocean">海洋</string>
+    <string name="preset_forest">森林</string>
+    <string name="preset_sunset">日落</string>
+    <string name="preset_rose">玫瑰</string>
+    <string name="preset_mono">单色</string>
+    <string name="preset_sky">晴空</string>
+    <string name="preset_sage">鼠尾草</string>
+    <string name="preset_lilac">丁香</string>
+    <string name="preset_terracotta">陶土</string>
+    <string name="preset_amber">琥珀</string>
+    <string name="preset_steel">钢蓝</string>
+
+    <!-- 语音（TTS） -->
+    <string name="voice_output_section">发声</string>
+    <string name="voice_main_label">主界面语音</string>
+    <string name="voice_main_desc_ready">对话回复在主界面朗读</string>
+    <string name="voice_overlay_label">悬浮窗语音</string>
+    <string name="voice_overlay_desc_ready">悬浮窗回复朗读</string>
+    <string name="voice_model_required_desc">需先下载语音模型</string>
+    <string name="voice_speed_label">语速: %1$sx</string>
+    <string name="voice_debug_preview_btn">试听文本（Debug）</string>
+    <string name="voice_debug_preview_title">输入试听文本</string>
+    <string name="voice_debug_preview_default">你好喵，今天天气真好。我今年18岁，电话是13800138000。</string>
+    <string name="voice_debug_speak">朗读</string>
+    <string name="voice_model_ready">语音模型已就绪</string>
+    <string name="voice_model_ready_desc">模型已下载，语音功能可用</string>
+    <string name="voice_model_delete">删除模型</string>
+    <string name="voice_model_downloading">正在下载语音模型…</string>
+    <string name="voice_model_importing">正在导入语音模型…</string>
+    <string name="voice_model_importing_desc">正在解压资源包，请稍候</string>
+    <string name="voice_model_download_failed">下载失败</string>
+    <string name="voice_model_not_downloaded">语音模型未下载</string>
+    <string name="voice_model_desc_with_url">约 84MB，下载后开放语音功能；网络受限可从本地 zip 导入</string>
+    <string name="voice_model_desc_no_url">未配置模型下载地址，可从本地 zip 导入</string>
+    <string name="voice_model_download">下载模型</string>
+    <string name="voice_model_import_local">从本地导入</string>
+
+    <string name="tts_error_no_url">未配置模型下载地址</string>
+    <string name="tts_error_incomplete_download">下载完成但文件不完整</string>
+    <string name="tts_error_download_failed">下载失败</string>
+    <string name="tts_error_cannot_read_file">无法读取所选文件</string>
+    <string name="tts_error_empty_zip">zip 为空或无法解析</string>
+    <string name="tts_error_missing_files">资源包缺少模型文件（需要 %1$s）</string>
+    <string name="tts_import_success">导入成功</string>
+    <string name="tts_error_incomplete_import">导入失败：文件不完整或大小不符</string>
+    <string name="tts_error_import_failed">导入失败</string>
+
+    <!-- 关于与更新 -->
+    <string name="about_app_info">应用信息</string>
+    <string name="about_app_title">MeaPet —— 梅尔桌宠</string>
+    <string name="about_app_tagline">一只 Live2D AI 梅尔 似乎非常不完善</string>
+    <string name="about_app_version">版本 %1$s</string>
+    <string name="about_poem">又是逢初度，霜轻叶落时。\n11·1 | 十月初六</string>
+    <string name="about_link_model_source">Live2D 模型来源</string>
+    <string name="about_link_github">GitHub 仓库</string>
+    <string name="about_link_group">交流 QQ 群</string>
+    <string name="about_tech_stack">技术栈：Live2D Cubism · Jetpack Compose · Ktor · Markwon · Coroutines · GLSurfaceView · sherpa-onnx · Kotlin 2.2 / AGP 9.3 / minSdk 26</string>
+    <string name="about_update_section">更新</string>
+    <string name="about_auto_update_label">启动时自动检查更新</string>
+    <string name="about_auto_update_desc">打开 App 时静默检测新版本，发现更新时提示；关闭后仅可在此手动检查</string>
+    <string name="about_checking">检查中…</string>
+    <string name="about_check_now">立即检查更新</string>
+    <string name="about_open_release">打开更新页面</string>
+    <string name="about_view_privacy">查看隐私政策</string>
+    <string name="about_exporting_logs">正在导出日志…</string>
+    <string name="about_export_logs">导出日志</string>
+    <string name="about_analytics_title">统计数据采集</string>
+    <string name="about_analytics_no_sdk">该构建未包含统计 SDK，不会采集任何数据</string>
+    <string name="about_analytics_agreed">已授权：友盟统计 SDK 正在采集去标识化的使用数据</string>
+    <string name="about_analytics_revoked">未授权：不会采集任何统计数据，App 正常使用</string>
+    <string name="about_revoke_consent">取消数据采集授权</string>
+    <string name="about_revoke_dialog_text">为确保撤回后立即、彻底停止数据采集，取消授权后 App 将自动退出；重新打开即可正常使用，且不会再进行任何统计采集。</string>
+    <string name="about_revoke_confirm">确认取消并退出</string>
+    <string name="about_revoke_keep">保留授权</string>
+    <string name="about_icons_attribution_title">开源图标</string>
+    <string name="about_icons_attribution_body">界面图标来自 Material Design Icons (Pictogrammers)，依据 Apache License 2.0 使用。</string>
+
+    <string name="update_available_notice">发现新版本 v%1$s</string>
+    <string name="update_up_to_date">当前已是最新版本（v%1$s）</string>
+    <string name="update_error_no_release">尚未发布正式版本</string>
+    <string name="update_error_http">检测失败（HTTP %1$d）</string>
+    <string name="update_error_parse">解析版本信息失败</string>
+    <string name="update_error_network">网络异常，检测失败</string>
+
+    <!-- 隐私与更新弹窗 -->
+    <string name="privacy_update_subtitle">隐私政策更新</string>
+    <string name="privacy_dialog_title_policy">隐私政策</string>
+    <string name="privacy_dialog_title_consent">隐私政策与数据采集</string>
+    <string name="privacy_welcome">欢迎使用 MeaPet！</string>
+    <string name="privacy_summary_body">本应用集成了友盟+ 统计 SDK，用于收集去标识化的使用数据（启动次数、使用时长等），以帮助改进产品质量。SDK 会采集设备标识符和网络信息。</string>
+    <string name="privacy_read_full_prefix">你可以查看完整的</string>
+    <string name="privacy_read_full_link">《隐私政策》</string>
+    <string name="privacy_read_full_suffix">了解详情。</string>
+    <string name="privacy_bullets">• 同意：开始采集去标识化的统计数据\n• 不同意：不采集任何数据，App 其余功能不受影响\n• 你可以随时在设置中取消授权（取消后 App 将自动退出）</string>
+    <string name="privacy_btn_view_policy">查看隐私政策</string>
+    <string name="privacy_btn_disagree">不同意</string>
+    <string name="privacy_btn_agree">同意并继续</string>
+
+    <string name="update_opt_in_title">检查更新</string>
+    <string name="update_opt_in_body">是否在应用启动时自动检查新版本？\n\n开启后，检测到新版本时会提示你；关闭后你仍可以在「关于」页面手动检测更新。</string>
+    <string name="update_opt_in_disable">不开启</string>
+    <string name="update_opt_in_enable">开启</string>
+
+    <!-- 隐私政策正文 -->
+    <string name="policy_version_label">版本：%1$s</string>
+    <string name="policy_effective_label">生效时间：%1$s</string>
+    <string name="policy_updated_label">修订时间：%1$s</string>
+    <string name="policy_sec_overview">一、概述</string>
+    <string name="policy_overview_umeng">本隐私政策由 %1$s（下称「开发者」）制定并生效，适用于 MeaPet（梅尔桌宠）应用。本应用集成了友盟+（Umeng）统计 SDK，用于收集去标识化的使用数据以帮助改进产品质量。</string>
+    <string name="policy_overview_nosdk">本隐私政策由 %1$s（下称「开发者」）制定并生效，适用于 MeaPet（梅尔桌宠）应用。本构建未包含任何统计 SDK，应用不采集任何使用数据。</string>
+    <string name="policy_sec_collected">二、采集的信息</string>
+    <string name="policy_collected_1">设备标识符：包括 OAID、Android ID、设备型号、操作系统版本等设备信息，用于生成脱敏标识</string>
+    <string name="policy_collected_2">网络信息：网络类型（WiFi/移动网络）、IP 地址</string>
+    <string name="policy_collected_3">应用使用信息：启动次数、使用时长、版本号、渠道来源</string>
+    <string name="policy_collected_4">统计基础库运行信息：用于统计 SDK 的稳定性监控与风控分析</string>
+    <string name="policy_sec_purpose">三、信息用途</string>
+    <string name="policy_purpose_1">生成脱敏的终端用户设备唯一性标识以提供统计服务</string>
+    <string name="policy_purpose_2">统计活跃用户数、启动次数与使用时长</string>
+    <string name="policy_purpose_3">发现并修复应用崩溃与性能问题</string>
+    <string name="policy_sec_sdk">四、第三方 SDK 信息</string>
+    <string name="policy_sdk_name">SDK 名称：友盟+ 统计 SDK</string>
+    <string name="policy_sdk_type">服务类型：应用统计分析</string>
+    <string name="policy_sdk_data">收集个人信息类型：设备标识符、网络信息、应用使用信息与基础库运行信息</string>
+    <string name="policy_sdk_link">隐私权政策链接：</string>
+    <string name="policy_sec_consent">五、授权管理</string>
+    <string name="policy_consent_1">首次启动时，你可以在弹窗中选择同意或不同意数据采集</string>
+    <string name="policy_consent_2">不同意：App 正常使用，但不会初始化统计 SDK，不采集任何统计数据</string>
+    <string name="policy_consent_3">预初始化仅作准备而不采集或上报任何数据；正式初始化仅在同意后进行</string>
+    <string name="policy_consent_4">同意后可随时在「设置」中取消授权，取消授权后 App 将自动退出</string>
+    <string name="policy_sec_security">六、数据安全</string>
+    <string name="policy_security_body">友盟+ SDK 采集的数据均经去标识化处理并通过加密通道传输，仅用于统计分析。</string>
+    <string name="policy_sec_rights">七、你的权利</string>
+    <string name="policy_rights_1">随时在「设置」中取消数据采集授权</string>
+    <string name="policy_rights_2">卸载本应用以删除本地数据</string>
+    <string name="policy_rights_3">在系统设置中清除应用数据以删除本地配置</string>
+    <string name="policy_sec_processing">二、数据处理</string>
+    <string name="policy_nosdk_1">本构建未包含统计 SDK，应用不采集、不上报任何使用数据</string>
+    <string name="policy_nosdk_2">你的聊天、记忆与设置等数据仅存储于本机，不会上传</string>
+    <string name="policy_sec_rights_nosdk">三、你的权利</string>
+    <string name="policy_sec_contact_umeng">八、联系我们</string>
+    <string name="policy_sec_contact_nosdk">四、联系我们</string>
+    <string name="policy_contact_body">本隐私政策主体为 %1$s。如有疑问，可通过 GitHub 仓库（%2$s）Issues 联系开发者。</string>
+
+    <!-- 悬浮窗 -->
+    <string name="overlay_channel_name">Live2D 悬浮窗</string>
+    <string name="overlay_channel_desc">在其他应用上层悬浮展示 Live2D 角色</string>
+    <string name="overlay_notif_title">Live2D 悬浮窗</string>
+    <string name="overlay_notif_text">双击打开菜单 · 拖动移动 · 双指缩放</string>
+    <string name="overlay_menu_close">关闭悬浮窗</string>
+    <string name="overlay_menu_input">唤起输入</string>
+    <string name="overlay_menu_unlock">解锁</string>
+    <string name="overlay_menu_lock">锁定</string>
+    <string name="overlay_menu_alpha">透明度</string>
+    <string name="overlay_alpha_label">透明度 %1$d%%</string>
+    <string name="overlay_send_failed">发送失败：%1$s</string>
+    <string name="overlay_unknown_error">未知错误</string>
+
+    <!-- API 错误与日志 -->
+    <string name="api_err_401">API Key 无效或未填写，请在设置中填写正确的 API Key</string>
+    <string name="api_err_402">API 余额不足，请充值后再试</string>
+    <string name="api_err_403">API Key 无权限访问，请检查密钥权限</string>
+    <string name="api_err_404">接口地址不存在，请检查 API 地址是否填写正确</string>
+    <string name="api_err_429">请求过于频繁，请稍后再试</string>
+    <string name="api_err_http">API 请求失败（HTTP %1$d）</string>
+    <string name="api_err_server_detail">%1$s\n（服务端返回：%2$s）</string>
+    <string name="log_share_subject">MeaPet 日志 %1$s</string>
+    <string name="log_share_chooser">分享日志给开发者</string>
+</resources>

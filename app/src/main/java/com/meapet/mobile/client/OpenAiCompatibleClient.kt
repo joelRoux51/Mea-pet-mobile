@@ -131,14 +131,12 @@ class OpenAiCompatibleClient(
             // 原始响应体只进日志：排查时必须有它（此前既不进 UI 也不进日志，
             // 用户只看到「请求过于频繁」而无从判断真因），但可能含冗长的网关堆栈
             Log.w(TAG, "HTTP ${response.statusCode} on ${request.url}: $body")
-            // 面向用户的友好文案 + 网关给出的具体原因
+            val detail = ApiResponse.errorMessage(body)
             throw ApiException(
                 statusCode = response.statusCode,
                 responseBody = body,
-                message = ApiException.friendlyMessage(
-                    response.statusCode,
-                    ApiResponse.errorMessage(body)
-                )
+                message = ApiException.friendlyMessage(response.statusCode, detail),
+                detail = detail
             )
         }
         return response

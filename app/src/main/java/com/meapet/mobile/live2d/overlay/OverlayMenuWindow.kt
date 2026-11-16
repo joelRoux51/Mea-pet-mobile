@@ -56,12 +56,6 @@ class OverlayMenuWindow(
 
         /** 每行高度，dp。 */
         private const val ITEM_HEIGHT_DP = 34f
-
-        private const val CLOSE_OVERLAY_LABEL = "关闭悬浮窗"
-        private const val OPEN_INPUT_LABEL = "唤起输入"
-        private const val LOCKED_LABEL = "解锁"
-        private const val UNLOCKED_LABEL = "锁定"
-        private const val ALPHA_LABEL = "透明度"
     }
 
     private val ctx: Context = context
@@ -126,18 +120,18 @@ class OverlayMenuWindow(
                 resetAutoHide()
                 false
             }
-            addView(menuItemRow(R.drawable.ic_close, CLOSE_OVERLAY_LABEL) {
+            addView(menuItemRow(R.drawable.ic_close, ctx.getString(R.string.overlay_menu_close)) {
                 hide()
                 onCloseOverlay()
             })
-            addView(menuItemRow(R.drawable.ic_overlay_input, OPEN_INPUT_LABEL) {
+            addView(menuItemRow(R.drawable.ic_overlay_input, ctx.getString(R.string.overlay_menu_input)) {
                 hide()
                 onOpenInput()
             })
             // 锁定/解锁：切换后不关菜单，仅就地刷新图标与文案，便于看到状态变化
             val lockRow = menuItemRow(
                 if (isLocked()) R.drawable.ic_overlay_unlock else R.drawable.ic_overlay_lock,
-                if (isLocked()) LOCKED_LABEL else UNLOCKED_LABEL
+                ctx.getString(if (isLocked()) R.string.overlay_menu_unlock else R.string.overlay_menu_lock)
             ) {
                 onToggleLock()
                 refreshLockRow()
@@ -147,7 +141,7 @@ class OverlayMenuWindow(
             lockLabelView = lockRow.getChildAt(1) as TextView
             addView(lockRow)
             // 透明度：关掉菜单，打开独立的透明度调节面板（滑杆实时调人物透明度）
-            addView(menuItemRow(R.drawable.ic_settings_opacity, ALPHA_LABEL) {
+            addView(menuItemRow(R.drawable.ic_settings_opacity, ctx.getString(R.string.overlay_menu_alpha)) {
                 hide()
                 onOpenAlpha()
             })
@@ -260,7 +254,7 @@ class OverlayMenuWindow(
     private fun refreshLockRow() {
         val locked = isLocked()
         lockIconView?.setImageResource(if (locked) R.drawable.ic_overlay_unlock else R.drawable.ic_overlay_lock)
-        lockLabelView?.text = if (locked) LOCKED_LABEL else UNLOCKED_LABEL
+        lockLabelView?.text = ctx.getString(if (locked) R.string.overlay_menu_unlock else R.string.overlay_menu_lock)
     }
 
     // ================ 视图构建 ================

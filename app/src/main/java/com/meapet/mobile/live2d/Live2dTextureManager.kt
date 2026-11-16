@@ -29,10 +29,16 @@ class Live2dTextureManager {
         val options = BitmapFactory.Options().apply {
             inPremultiplied = Live2dDefine.PREMULTIPLIED_ALPHA_ENABLE
         }
-        // use{} 确保 decodeStream 抛异常时流也被关闭
-        val bitmap = assetManager.open(filePath).use { stream ->
-            BitmapFactory.decodeStream(stream, null, options)
-        } ?: error("Failed to decode bitmap from $filePath")
+        val bitmap = if (filePath.startsWith("/")) {
+            java.io.FileInputStream(filePath).use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+        } else {
+            // use{} 确保 decodeStream 抛异常时流也被关闭
+            assetManager.open(filePath).use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+        } ?: return null
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
 

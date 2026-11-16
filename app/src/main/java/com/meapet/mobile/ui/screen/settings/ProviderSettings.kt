@@ -1,5 +1,10 @@
 package com.meapet.mobile.ui.screen.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,33 +34,37 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.ContextCompat
+import com.meapet.mobile.R
 import com.meapet.mobile.viewmodel.SettingsUiState
 import com.meapet.mobile.viewmodel.SettingsViewModel
 
 // ═══════════════════════════════════════════════════
-//  提供商：API 接入与模型参数
+//  提供商：API 接入、模型参数与 Telegram Bot
 // ═══════════════════════════════════════════════════
 
-/** API 配置：端点说明 + API Key / 地址输入。 */
 @Composable
 internal fun ApiConfigSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     local: SettingsLocalState
 ) {
-    SectionTitle("API 配置")
+    SectionTitle(stringResource(R.string.provider_api_config))
 
     Text(
-        "需要一个 OpenAI 兼容的 API 端点",
+        stringResource(R.string.provider_api_hint),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
         modifier = Modifier.padding(bottom = 8.dp)
@@ -64,7 +73,7 @@ internal fun ApiConfigSection(
     OutlinedTextField(
         value = local.apiKey,
         onValueChange = { local.apiKey = it },
-        label = { Text("API Key") },
+        label = { Text(stringResource(R.string.provider_api_key)) },
         placeholder = { Text("sk-...") },
         modifier = Modifier
             .fillMaxWidth()
@@ -77,10 +86,11 @@ internal fun ApiConfigSection(
         trailingIcon = {
             TextButton(
                 onClick = { local.apiKeyVisible = !local.apiKeyVisible },
-                modifier = Modifier.width(56.dp)
+                modifier = Modifier.width(64.dp)
             ) {
                 Text(
-                    text = if (local.apiKeyVisible) "隐藏" else "显示",
+                    text = if (local.apiKeyVisible) stringResource(R.string.action_hide)
+                           else stringResource(R.string.action_show),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -94,7 +104,7 @@ internal fun ApiConfigSection(
     OutlinedTextField(
         value = local.apiUrl,
         onValueChange = { local.apiUrl = it },
-        label = { Text("API 地址") },
+        label = { Text(stringResource(R.string.provider_api_url)) },
         modifier = Modifier
             .fillMaxWidth()
             .saveOnFocusChange { viewModel.saveApiUrl(local.apiUrl) },
@@ -103,7 +113,6 @@ internal fun ApiConfigSection(
     )
 }
 
-/** 模型参数：模型名 + 拉取列表 + Temperature / MaxToken 滑杆。 */
 @Composable
 internal fun ModelParamsSection(
     state: SettingsUiState,
@@ -111,12 +120,12 @@ internal fun ModelParamsSection(
     local: SettingsLocalState,
     darkTheme: Boolean
 ) {
-    SectionTitle("模型参数")
+    SectionTitle(stringResource(R.string.provider_model_params))
 
     OutlinedTextField(
         value = local.model,
         onValueChange = { local.model = it },
-        label = { Text("模型") },
+        label = { Text(stringResource(R.string.provider_model)) },
         modifier = Modifier
             .fillMaxWidth()
             .saveOnFocusChange { viewModel.saveModel(local.model) },
@@ -128,7 +137,6 @@ internal fun ModelParamsSection(
 
     OutlinedButton(
         onClick = {
-            // 先落盘当前编辑中的 Key/URL，再拉列表
             viewModel.saveApiKey(local.apiKey)
             viewModel.saveApiUrl(local.apiUrl)
             viewModel.fetchModels(local.apiKey, local.apiUrl)
@@ -142,9 +150,9 @@ internal fun ModelParamsSection(
                 strokeWidth = 2.dp
             )
             Spacer(Modifier.width(8.dp))
-            Text("获取中…")
+            Text(stringResource(R.string.provider_fetching_models))
         } else {
-            Text("获取模型列表")
+            Text(stringResource(R.string.provider_fetch_models))
         }
     }
 
@@ -163,7 +171,7 @@ internal fun ModelParamsSection(
     if (state.availableModels.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "共 ${state.availableModels.size} 个模型，点选填入上方",
+            text = stringResource(R.string.provider_models_count, state.availableModels.size),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_FAINT_TEXT)
         )
@@ -203,7 +211,7 @@ internal fun ModelParamsSection(
                         if (selected) {
                             Icon(
                                 imageVector = Icons.Filled.Check,
-                                contentDescription = "已选中",
+                                contentDescription = stringResource(R.string.action_selected),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -220,13 +228,9 @@ internal fun ModelParamsSection(
     Spacer(Modifier.height(8.dp))
 
     ParamLabelWithHelp(
-        label = "Temperature: ${"%.2f".format(local.temperature)}",
-        helpTitle = "Temperature（随机度）",
-        helpText = "决定回复的随机程度。数值越低，模型越倾向挑高概率的词，回答更稳定、" +
-            "更贴合设定；越高则用词更多样、更有意外感，但也更容易偏题或前后矛盾。\n\n" +
-            "桌宠闲聊建议 0.8~1.2；需要它严格听指令时降到 0.3 以下。\n\n" +
-            "注意：设为 0 也不保证每次输出完全一致；部分提供商上限为 1.0，" +
-            "推理模型会忽略此参数。"
+        label = stringResource(R.string.provider_temperature_label, "%.2f".format(local.temperature)),
+        helpTitle = stringResource(R.string.provider_temperature_help_title),
+        helpText = stringResource(R.string.provider_temperature_help_text)
     )
     Slider(
         value = local.temperature,
@@ -243,7 +247,7 @@ internal fun ModelParamsSection(
     Spacer(Modifier.height(8.dp))
 
     Text(
-        text = "最大 Token: ${local.maxTokens.toInt()}",
+        text = stringResource(R.string.provider_max_tokens, local.maxTokens.toInt()),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -258,4 +262,142 @@ internal fun ModelParamsSection(
         modifier = Modifier.fillMaxWidth(),
         colors = SliderDefaults.colors(inactiveTrackColor = sliderTrackColor(darkTheme))
     )
+}
+
+/** Telegram Bot configuration: enable switch, bot token, optional chat ID filter, test button, notification permission. */
+@Composable
+internal fun TelegramBotSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    local: SettingsLocalState,
+    darkTheme: Boolean
+) {
+    val context = LocalContext.current
+
+    SectionTitle(stringResource(R.string.telegram_section_title))
+
+    SettingsSwitchRow(
+        label = stringResource(R.string.telegram_enable_label),
+        description = stringResource(R.string.telegram_enable_desc),
+        checked = state.telegramEnabled,
+        darkTheme = darkTheme,
+        onCheckedChange = {
+            viewModel.saveTelegramBotToken(local.telegramBotToken)
+            viewModel.saveTelegramChatId(local.telegramChatId)
+            viewModel.updateTelegramEnabled(it)
+        }
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = local.telegramBotToken,
+        onValueChange = { local.telegramBotToken = it },
+        label = { Text(stringResource(R.string.telegram_bot_token)) },
+        placeholder = { Text(stringResource(R.string.telegram_bot_token_placeholder)) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .saveOnFocusChange { viewModel.saveTelegramBotToken(local.telegramBotToken) },
+        singleLine = true,
+        visualTransformation = if (local.telegramTokenVisible)
+            VisualTransformation.None
+        else
+            PasswordVisualTransformation(),
+        trailingIcon = {
+            TextButton(
+                onClick = { local.telegramTokenVisible = !local.telegramTokenVisible },
+                modifier = Modifier.width(64.dp)
+            ) {
+                Text(
+                    text = if (local.telegramTokenVisible) stringResource(R.string.action_hide)
+                           else stringResource(R.string.action_show),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedTextField(
+        value = local.telegramChatId,
+        onValueChange = { local.telegramChatId = it },
+        label = { Text(stringResource(R.string.telegram_chat_id)) },
+        placeholder = { Text(stringResource(R.string.telegram_chat_id_placeholder)) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .saveOnFocusChange { viewModel.saveTelegramChatId(local.telegramChatId) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    OutlinedButton(
+        onClick = {
+            viewModel.saveTelegramBotToken(local.telegramBotToken)
+            viewModel.saveTelegramChatId(local.telegramChatId)
+            viewModel.testTelegramConnection(local.telegramBotToken)
+        },
+        enabled = !state.telegramTesting,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (state.telegramTesting) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.telegram_testing))
+        } else {
+            Text(stringResource(R.string.telegram_test_connection))
+        }
+    }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        var notifGranted by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+        val requestNotifPerm = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            notifGranted = granted
+        }
+        if (!notifGranted) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { requestNotifPerm.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.telegram_notif_permission_btn))
+            }
+        }
+    }
+
+    state.telegramTestResult?.let { msg ->
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = msg,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.dismissTelegramFeedback() }
+        )
+    }
+
+    state.telegramTestError?.let { err ->
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = err,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.dismissTelegramFeedback() }
+        )
+    }
 }

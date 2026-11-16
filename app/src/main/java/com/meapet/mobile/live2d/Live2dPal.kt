@@ -48,15 +48,36 @@ object Live2dPal {
 
     /** 异步预热模型目录全部文件（IO 线程）。幂等：同一目录只预热一次。 */
     fun prewarmDirectory(context: Context, dir: String) {
-        if (cachedRoot == dir) return
-        cachedRoot = dir
+        val normalizedDir = dir.trimEnd('/')
+        if (cachedRoot == normalizedDir) return
+        cachedRoot = normalizedDir
         CoroutineScope(Dispatchers.IO).launch {
-            val ctx = context.applicationContext
-            val assets = ctx.assets
             val startedAt = SystemClock.uptimeMillis()
             try {
+                if (normalizedDir.startsWith("/")) {
+                    val rootDir = java.io.File(normalizedDir)
+                    var count = 0
+                    if (rootDir.isDirectory) {
+                        rootDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                            try {
+                                byteCache[file.absolutePath] = file.readBytes()
+                                count++
+                            } catch (e: Exception) {
+                                Log.w(TAG, "预热读取失败: ${file.absolutePath}", e)
+                            }
+                        }
+                    }
+                    Log.i(
+                        TAG,
+                        "Live2D 外部模型目录预热完成：$count 个文件，${SystemClock.uptimeMillis() - startedAt}ms（IO 线程）"
+                    )
+                    return@launch
+                }
+
+                val ctx = context.applicationContext
+                val assets = ctx.assets
                 // 目录判定交给「能否列出子项」，不依赖 ROM 是否给目录名加尾斜杠
-                val files = collectAssetFiles(dir) { path ->
+                val files = collectAssetFiles(normalizedDir) { path ->
                     try {
                         assets.list(path)?.toList() ?: emptyList()
                     } catch (_: IOException) {
@@ -92,8 +113,18 @@ object Live2dPal {
     }
 
     fun loadFileAsBytes(path: String): ByteArray {
-        // 命中预热缓存：免 asset 读取，GL 线程只做解析
+        // 命中预热缓存：免读取，GL 线程只做解析
         byteCache[path]?.let { return it }
+
+        if (path.startsWith("/")) {
+            return try {
+                val file = java.io.File(path)
+                if (file.isFile) file.readBytes() else ByteArray(0)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load filesystem file: $path", e)
+                ByteArray(0)
+            }
+        }
 
         return try {
             // 用 application context（不随 Activity 销毁失效），Activity 不可用时回退

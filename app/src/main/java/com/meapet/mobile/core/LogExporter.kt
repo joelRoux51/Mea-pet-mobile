@@ -8,6 +8,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.meapet.mobile.BuildConfig
+import com.meapet.mobile.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -163,14 +164,18 @@ object LogExporter {
 
     /** 经 FileProvider 拉起系统分享菜单。 */
     private fun share(context: Context, file: File) {
+        val localized = LocaleHelper.wrap(context)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "MeaPet 日志 ${file.name}")
+            putExtra(Intent.EXTRA_SUBJECT, localized.getStringOrFallback(R.string.log_share_subject, "MeaPet Logs %1\$s", file.name))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(send, "分享日志给开发者").apply {
+        val chooser = Intent.createChooser(
+            send,
+            localized.getStringOrFallback(R.string.log_share_chooser, "Share logs with developer")
+        ).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)

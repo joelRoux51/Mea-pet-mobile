@@ -28,6 +28,9 @@ internal class SettingsLocalState(initial: SettingsUiState) {
     var maxTokens by mutableStateOf(initial.maxTokens.toFloat())
     var summaryInterval by mutableStateOf(initial.summaryInterval.toFloat())
     var apiKeyVisible by mutableStateOf(false)
+    var telegramBotToken by mutableStateOf(initial.telegramBotToken)
+    var telegramChatId by mutableStateOf(initial.telegramChatId)
+    var telegramTokenVisible by mutableStateOf(false)
 
     /** 离开页面时的兜底保存（值有变化才落盘，见 ViewModel）。 */
     fun persist(viewModel: SettingsViewModel) {
@@ -35,6 +38,8 @@ internal class SettingsLocalState(initial: SettingsUiState) {
         viewModel.saveApiUrl(apiUrl)
         viewModel.saveModel(model)
         viewModel.saveSystemPrompt(systemPrompt)
+        viewModel.saveTelegramBotToken(telegramBotToken)
+        viewModel.saveTelegramChatId(telegramChatId)
     }
 }
 
@@ -45,3 +50,4 @@ internal fun rememberSettingsLocalState(state: SettingsUiState): SettingsLocalSt
 // ═══════════════════════════════════════════════════
 //  Section 组件
 // ═══════════════════════════════════════════════════
+

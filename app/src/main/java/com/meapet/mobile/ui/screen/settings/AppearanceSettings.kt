@@ -1,5 +1,6 @@
 package com.meapet.mobile.ui.screen.settings
 
+import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -31,10 +32,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,12 +63,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.meapet.mobile.R
+import com.meapet.mobile.core.LocaleHelper
 import com.meapet.mobile.ui.theme.THEME_PRESETS
 import com.meapet.mobile.viewmodel.SettingsUiState
 import com.meapet.mobile.viewmodel.SettingsViewModel
@@ -71,30 +80,206 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // ═══════════════════════════════════════════════════
-//  外观：背景壁纸、气泡透明度、主题模式与配色预设
+//  外观：语言、Live2D 模型、背景壁纸、气泡透明度与主题
 // ═══════════════════════════════════════════════════
 
-/**
- * 背景壁纸：当前预览 + 从相册选图 + 恢复默认 + 模糊强度。
- *
- * 「恢复默认」立即切回纯色背景，随后由设置页的撤销条给一次反悔机会
- * （撤销窗口内壁纸文件仍保留，见 SettingsViewModel.clearWallpaper）。
- */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun LanguageSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+
+    SectionTitle(stringResource(R.string.language_section_title))
+    Text(
+        text = stringResource(R.string.language_label),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    val options = listOf(
+        LocaleHelper.LANG_SYSTEM to R.string.language_system,
+        LocaleHelper.LANG_FR to R.string.language_fr,
+        LocaleHelper.LANG_EN to R.string.language_en,
+        LocaleHelper.LANG_ES to R.string.language_es,
+        LocaleHelper.LANG_ZH to R.string.language_zh
+    )
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(bottom = 8.dp)
+    ) {
+        options.forEach { (code, labelRes) ->
+            FilterChipLike(
+                label = stringResource(labelRes),
+                selected = state.appLanguage == code,
+                enabled = true,
+                onClick = {
+                    if (state.appLanguage != code) {
+                        LocaleHelper.setLanguage(context, code)
+                        viewModel.updateAppLanguage(code)
+                        activity?.recreate()
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun Live2dModelSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    val pickModelZip = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importLive2dModelZip(it) }
+    }
+
+    SectionTitle(stringResource(R.string.live2d_section_title))
+    Text(
+        text = stringResource(R.string.live2d_section_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        state.live2dModels.forEach { model ->
+            val isActive = model.id == state.activeLive2dModelId
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.selectLive2dModel(model.id) },
+                color = if (isActive) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ALPHA_CARD_BG_MID)
+                },
+                shape = RoundedCornerShape(12.dp),
+                border = if (isActive) {
+                    androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (model.isBuiltIn) {
+                                stringResource(R.string.live2d_builtin_name)
+                            } else {
+                                model.displayName
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (isActive) {
+                            Text(
+                                text = stringResource(R.string.live2d_active_badge),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (isActive) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = stringResource(R.string.live2d_active_badge),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    if (!model.isBuiltIn) {
+                        IconButton(
+                            onClick = { viewModel.deleteLive2dModel(model.id) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.action_delete),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(10.dp))
+
+    OutlinedButton(
+        onClick = {
+            pickModelZip.launch(
+                arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")
+            )
+        },
+        enabled = !state.live2dImporting,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (state.live2dImporting) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.live2d_importing))
+        } else {
+            Text(stringResource(R.string.live2d_import_zip))
+        }
+    }
+
+    state.live2dStatusMessage?.let { msg ->
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = msg,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.dismissLive2dFeedback() }
+        )
+    }
+
+    state.live2dErrorMessage?.let { err ->
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = err,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.dismissLive2dFeedback() }
+        )
+    }
+
+    Spacer(Modifier.height(4.dp))
+}
+
 @Composable
 internal fun BackgroundWallpaperSection(
     state: SettingsUiState,
     viewModel: SettingsViewModel,
     darkTheme: Boolean
 ) {
-    SectionTitle("背景壁纸")
+    SectionTitle(stringResource(R.string.wallpaper_section_title))
     Text(
-        text = "从相册选一张图片作为主界面聊天背景，实时生效",
+        text = stringResource(R.string.wallpaper_section_desc),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
         modifier = Modifier.padding(bottom = 8.dp)
     )
 
-    // 相册选图（PickVisualMedia，免权限；activity-compose 已内置）
     val pickMedia = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -150,7 +335,7 @@ internal fun BackgroundWallpaperSection(
         if (bmp != null) {
             Image(
                 bitmap = bmp.asImageBitmap(),
-                contentDescription = "当前壁纸",
+                contentDescription = stringResource(R.string.wallpaper_preview_cd),
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(PREVIEW_ASPECT_RATIO)
@@ -159,7 +344,7 @@ internal fun BackgroundWallpaperSection(
             )
         } else {
             Text(
-                text = "当前为默认纯色背景",
+                text = stringResource(R.string.wallpaper_default_solid),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT)
             )
@@ -176,21 +361,20 @@ internal fun BackgroundWallpaperSection(
             },
             modifier = Modifier.weight(1f)
         ) {
-            Text("从相册选择")
+            Text(stringResource(R.string.wallpaper_pick_gallery))
         }
         OutlinedButton(
-            // 立即切纯色，撤销条由设置页统一显示
             onClick = { viewModel.clearWallpaper() },
             enabled = state.wallpaperPath.isNotBlank(),
             modifier = Modifier.weight(1f)
         ) {
-            Text("恢复默认")
+            Text(stringResource(R.string.action_restore_default))
         }
     }
 
     Spacer(Modifier.height(8.dp))
     Text(
-        text = "背景模糊: ${kotlin.math.round(localBlur * 100).toInt()}%",
+        text = stringResource(R.string.wallpaper_blur_label, kotlin.math.round(localBlur * 100).toInt()),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
             alpha = if (state.wallpaperPath.isNotBlank()) 1f else 0.5f
@@ -320,7 +504,7 @@ internal fun AppearanceSection(
     }
 
     Text(
-        text = "聊天气泡透明度: ${(localAlpha * 100).toInt()}%",
+        text = stringResource(R.string.chat_bubble_alpha_label, (localAlpha * 100).toInt()),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -337,9 +521,8 @@ internal fun AppearanceSection(
     )
 
     Spacer(Modifier.height(12.dp))
-    SectionTitle("主题")
+    SectionTitle(stringResource(R.string.theme_section_title))
 
-    // ── 主题模式 ──
     ThemeModeSelector(
         current = state.themeMode,
         onSelect = { viewModel.updateThemeMode(it) }
@@ -347,18 +530,20 @@ internal fun AppearanceSection(
 
     Spacer(Modifier.height(12.dp))
 
-    // ── 动态颜色开关 ──
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     SettingsSwitchRow(
-        label = "使用系统动态颜色",
-        description = if (dynamicColorSupported) "关闭后可选择预设主题色" else "当前系统不支持动态颜色",
+        label = stringResource(R.string.theme_dynamic_color),
+        description = if (dynamicColorSupported) {
+            stringResource(R.string.theme_dynamic_color_on_desc)
+        } else {
+            stringResource(R.string.theme_dynamic_color_off_desc)
+        },
         checked = state.enableDynamicColor && dynamicColorSupported,
         darkTheme = darkTheme,
         onCheckedChange = { if (dynamicColorSupported) viewModel.updateEnableDynamicColor(it) },
         enabled = dynamicColorSupported
     )
 
-    // ── 颜色预设选择区（关闭动态颜色时展开） ──
     AnimatedVisibility(
         visible = !(state.enableDynamicColor && dynamicColorSupported),
         enter = expandVertically(),
@@ -376,7 +561,11 @@ private fun ThemeModeSelector(
     current: String,
     onSelect: (String) -> Unit
 ) {
-    val options = listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色")
+    val options = listOf(
+        "system" to stringResource(R.string.theme_mode_system),
+        "light" to stringResource(R.string.theme_mode_light),
+        "dark" to stringResource(R.string.theme_mode_dark)
+    )
     var expanded by remember { mutableStateOf(false) }
     var showPopup by remember { mutableStateOf(false) }
     var boxWidthPx by remember { mutableStateOf(0) }
@@ -403,10 +592,10 @@ private fun ThemeModeSelector(
             }
     ) {
         OutlinedTextField(
-            value = options.firstOrNull { it.first == current }?.second ?: "跟随系统",
+            value = options.firstOrNull { it.first == current }?.second ?: options.first().second,
             onValueChange = {},
             readOnly = true,
-            label = { Text("主题模式") },
+            label = { Text(stringResource(R.string.theme_mode_label)) },
             trailingIcon = {
                 Icon(
                     imageVector = if (expanded) Icons.Filled.KeyboardArrowUp
@@ -417,7 +606,6 @@ private fun ThemeModeSelector(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // 透明点击层——避免与 OutlinedTextField 的内部触摸处理冲突
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -461,9 +649,6 @@ private fun ThemeModeSelector(
     }
 }
 
-/**
- * 颜色预设选择区——色块网格。
- */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorPresetSelector(
@@ -472,7 +657,7 @@ private fun ColorPresetSelector(
 ) {
     Column(modifier = Modifier.padding(top = 8.dp)) {
         Text(
-            "主题色预设",
+            stringResource(R.string.theme_presets_label),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -491,7 +676,6 @@ private fun ColorPresetSelector(
                         .clickable { onSelect(preset.id) }
                         .width(56.dp)
                 ) {
-                    // 色块圆
                     val borderMod = if (isSelected) {
                         Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                     } else {
@@ -506,7 +690,7 @@ private fun ColorPresetSelector(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = preset.name,
+                        text = stringResource(preset.nameRes),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (isSelected)
                             MaterialTheme.colorScheme.primary

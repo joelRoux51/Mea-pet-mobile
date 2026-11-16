@@ -19,9 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.meapet.mobile.R
 import com.meapet.mobile.chat.ChatMessage
 import com.meapet.mobile.chat.ChatRole
 
@@ -117,6 +120,15 @@ private fun AssistantBubble(
         horizontalArrangement = Arrangement.Start
     ) {
         Column {
+            if (message.isFromTelegram) {
+                Text(
+                    text = stringResource(R.string.chat_telegram_badge),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+                )
+            }
             Box(
                 modifier = Modifier
                     .widthIn(max = bubbleMaxWidth())
@@ -144,7 +156,7 @@ private fun AssistantBubble(
             if (message.isStreaming) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "正在输入...",
+                    text = stringResource(R.string.chat_streaming_typing),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f * alpha),
                     modifier = Modifier.padding(start = 4.dp)
