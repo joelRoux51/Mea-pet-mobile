@@ -126,6 +126,8 @@
     <string name="live2d_section_title">Live2D 模型</string>
     <string name="live2d_section_desc">切换角色模型或直接导入外部 Cubism 模型（.zip），无需重新编译</string>
     <string name="live2d_builtin_name">Mea（内置模型）</string>
+    <string name="live2d_alita_builtin_name">Alita 2D（内置立绘）</string>
+    <string name="live2d_sprite_2d_badge">2D 立绘模式 (PNG)</string>
     <string name="live2d_import_zip">导入 .zip 模型</string>
     <string name="live2d_importing">正在导入模型…</string>
     <string name="live2d_active_badge">使用中</string>

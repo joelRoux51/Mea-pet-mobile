@@ -58,6 +58,14 @@ class Live2dManager private constructor() {
 
     private var modelLoaded = false
 
+    private val spriteRenderer = SpriteAvatarRenderer()
+
+    @Volatile
+    private var dragX = 0f
+
+    @Volatile
+    private var dragY = 0f
+
     private val projection = CubismMatrix44.create()
 
     data class EmotionRequest(val sequence: Long, val emotion: String)
@@ -93,6 +101,7 @@ class Live2dManager private constructor() {
     fun resetModel() {
         modelLoaded = false
         loadedSpec = null
+        spriteRenderer.reset()
         model?.deleteModel()
         model = null
         loadModel()
@@ -102,6 +111,23 @@ class Live2dManager private constructor() {
         val spec = activeSpec
         if (modelLoaded && loadedSpec == spec) return
         val dir = spec.dirPath
+        if (spec.renderType == AvatarRenderType.SPRITE_2D) {
+            Log.d(TAG, "Loading 2D sprite avatar from: $dir")
+            val ok = spriteRenderer.load(dir, Live2dDelegate.getInstance().textureManager)
+            if (ok) {
+                model = null
+                loadedSpec = spec
+                modelLoaded = true
+                Log.d(TAG, "2D sprite avatar loaded successfully: ${spec.displayName}")
+            } else {
+                Log.e(TAG, "Failed to load 2D sprite avatar: ${spec.displayName}")
+                activeSpec = Live2dModelStore.BUILT_IN_MODEL
+                loadedSpec = null
+                modelLoaded = false
+                loadModel()
+            }
+            return
+        }
         Log.d(TAG, "Loading model from: $dir${spec.modelJsonName}")
         try {
             val m = Live2dModel(dir)
@@ -134,11 +160,32 @@ class Live2dManager private constructor() {
             Live2dDelegate.getInstance().textureManager.releaseInvalidTextures()
             resetModel()
         }
-        val m = model ?: return
         val delegate = Live2dDelegate.getInstance()
         val width = delegate.windowWidth
         val height = delegate.windowHeight
         if (width <= 0 || height <= 0) return
+
+        if (loadedSpec?.renderType == AvatarRenderType.SPRITE_2D) {
+            latestEmotionRef.get()?.let { req ->
+                if (req.sequence != lastAppliedMainSequence) {
+                    lastAppliedMainSequence = req.sequence
+                    spriteRenderer.setEmotion(req.emotion)
+                    Log.d(TAG, "Emotion '${req.emotion}' applied on 2D sprite avatar")
+                }
+            }
+            spriteRenderer.draw(
+                viewWidth = width,
+                viewHeight = height,
+                shaderProgramId = delegate.view.spriteShaderProgramId,
+                dragX = dragX,
+                dragY = dragY,
+                opacity = 1f,
+                isOverlay = false
+            )
+            return
+        }
+
+        val m = model ?: return
 
         val aspect = width.toFloat() / height.toFloat()
         val displayRatio = height.toFloat() / width.toFloat()
@@ -177,9 +224,11 @@ class Live2dManager private constructor() {
 
     /** 视角跟随：直接设 model 字段，update 内部会读取并应用。 */
     fun onDrag(x: Float, y: Float) {
+        dragX = x.coerceIn(-1f, 1f)
+        dragY = y.coerceIn(-1f, 1f)
         model?.let { m ->
-            m.dragX = x.coerceIn(-1f, 1f)
-            m.dragY = y.coerceIn(-1f, 1f)
+            m.dragX = dragX
+            m.dragY = dragY
             // 也通知 Cubism SDK 的 dragManager（保留原有 Look 系统兼容）
             try { m.setDragging(x, y) } catch (_: Exception) {}
         }

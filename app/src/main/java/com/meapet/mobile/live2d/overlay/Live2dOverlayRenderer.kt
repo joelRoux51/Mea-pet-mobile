@@ -7,11 +7,14 @@ import com.live2d.sdk.cubism.framework.CubismFramework
 import com.live2d.sdk.cubism.framework.math.CubismMatrix44
 import com.live2d.sdk.cubism.framework.rendering.android.CubismOffscreenManagerAndroid
 import com.live2d.sdk.cubism.framework.rendering.android.CubismShaderAndroid
+import com.meapet.mobile.live2d.AvatarRenderType
 import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dModel
 import com.meapet.mobile.live2d.Live2dModelSpec
 import com.meapet.mobile.live2d.Live2dPal
+import com.meapet.mobile.live2d.Live2dSpriteShader
 import com.meapet.mobile.live2d.Live2dTextureManager
+import com.meapet.mobile.live2d.SpriteAvatarRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -33,6 +36,8 @@ class Live2dOverlayRenderer(
 
     private var model: Live2dModel? = null
     private var textureManager: Live2dTextureManager? = null
+    private var spriteShader: Live2dSpriteShader? = null
+    private val spriteRenderer = SpriteAvatarRenderer()
     private val projection = CubismMatrix44.create()
     private var winWidth = 0
     private var winHeight = 0
@@ -64,6 +69,7 @@ class Live2dOverlayRenderer(
      * 释放 EGL 上下文之前入队，保证 renderer 的 GL 删除操作仍有有效上下文。
      */
     fun releaseModel() {
+        spriteRenderer.reset()
         model?.deleteModel()
         model = null
         modelLoaded = false
@@ -88,6 +94,8 @@ class Live2dOverlayRenderer(
         }
 
         textureManager = Live2dTextureManager()
+        spriteShader?.close()
+        spriteShader = Live2dSpriteShader()
         alphaCompositor.onContextCreated()
         // surface 重建时旧 GL 上下文已销毁（GL 资源随之释放），
         // 但 moc/model 的 native 内存仍需显式释放后再重新加载
@@ -117,8 +125,30 @@ class Live2dOverlayRenderer(
                 if (isShuttingDown()) return
             }
 
-            val m = model ?: return
             if (winWidth <= 0 || winHeight <= 0) return
+
+            if (loadedSpec?.renderType == AvatarRenderType.SPRITE_2D) {
+                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+                Live2dManager.getInstance().latestEmotionRequest()?.let { req ->
+                    if (req.sequence != lastAppliedEmotionSequence) {
+                        lastAppliedEmotionSequence = req.sequence
+                        spriteRenderer.setEmotion(req.emotion)
+                    }
+                }
+                spriteRenderer.draw(
+                    viewWidth = winWidth,
+                    viewHeight = winHeight,
+                    shaderProgramId = spriteShader?.programId ?: 0,
+                    dragX = 0f,
+                    dragY = 0f,
+                    opacity = opacity,
+                    isOverlay = true
+                )
+                return
+            }
+
+            val m = model ?: return
             // 先做空值判断再进离屏，避免中途 return 把离屏目标留在绑定状态
             val core = m.model ?: return
             val mm = m.modelMatrix ?: return
@@ -181,9 +211,19 @@ class Live2dOverlayRenderer(
     private fun loadModel(spec: Live2dModelSpec) {
         try {
             val dir = spec.dirPath
+            val tm = textureManager ?: return
+            if (spec.renderType == AvatarRenderType.SPRITE_2D) {
+                val ok = spriteRenderer.load(dir, tm)
+                if (!ok) {
+                    throw IllegalStateException("Failed to load 2D sprite textures from $dir")
+                }
+                model = null
+                loadedSpec = spec
+                Log.d(TAG, "Overlay 2D sprite avatar loaded: ${spec.displayName}")
+                return
+            }
             val fileName = spec.modelJsonName
             val m = Live2dModel(dir)
-            val tm = textureManager ?: return
             m.loadAssets(dir, fileName)
             m.bindTextures(tm)
             model = m

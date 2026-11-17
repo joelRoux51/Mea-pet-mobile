@@ -25,6 +25,9 @@ class Live2dView : AutoCloseable {
     private var renderingSprite: Live2dSprite? = null
     private var spriteShader: Live2dSpriteShader? = null
 
+    val spriteShaderProgramId: Int
+        get() = spriteShader?.programId ?: 0
+
     override fun close() {
         renderingBuffer.destroyRenderTarget()
         renderingSprite = null

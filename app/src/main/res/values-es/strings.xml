@@ -126,6 +126,8 @@
     <string name="live2d_section_title">Modelo Live2D</string>
     <string name="live2d_section_desc">Cambia de personaje o importa un modelo Cubism externo (.zip) sin recompilar</string>
     <string name="live2d_builtin_name">Mea (Integrado)</string>
+    <string name="live2d_alita_builtin_name">Alita 2D (Integrado)</string>
+    <string name="live2d_sprite_2d_badge">Modo Avatar 2D (Sprites PNG)</string>
     <string name="live2d_import_zip">Importar modelo (.zip)</string>
     <string name="live2d_importing">Importando modelo…</string>
     <string name="live2d_active_badge">Activo</string>

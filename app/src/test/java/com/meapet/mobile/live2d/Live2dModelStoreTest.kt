@@ -57,13 +57,21 @@ class Live2dModelStoreTest {
         assertTrue(File(spec.dirPath, "hiyori.2048/texture_00.png").isFile)
 
         val models = store.listModels()
-        assertEquals(2, models.size)
+        assertEquals(3, models.size)
         assertTrue(models[0].isBuiltIn)
-        assertEquals(spec.id, models[1].id)
+        assertEquals(AvatarRenderType.LIVE2D, models[0].renderType)
+        assertTrue(models[1].isBuiltIn)
+        assertEquals(Live2dModelStore.ALITA_SPRITE_MODEL_ID, models[1].id)
+        assertEquals(AvatarRenderType.SPRITE_2D, models[1].renderType)
+        assertEquals(spec.id, models[2].id)
         assertEquals(spec.id, store.findById(spec.id).id)
+        assertEquals(
+            Live2dModelStore.ALITA_SPRITE_MODEL_ID,
+            store.findById(Live2dModelStore.ALITA_SPRITE_MODEL_ID).id
+        )
 
         assertTrue(store.deleteModel(spec.id))
-        assertEquals(1, store.listModels().size)
+        assertEquals(2, store.listModels().size)
         assertTrue(store.findById(spec.id).isBuiltIn)
     }
 
@@ -100,5 +108,17 @@ class Live2dModelStoreTest {
         val spec = (res as Live2dImportResult.Success).spec
         assertEquals("my_cat", spec.displayName)
         assertFalse(File(filesDir, "evil.txt").exists())
+    }
+
+    @Test
+    fun `sprite renderer maps all emotion aliases to supported 2d sprite keys`() {
+        assertEquals("joie", SpriteAvatarRenderer.resolveSupportedEmotion("joie"))
+        assertEquals("joie", SpriteAvatarRenderer.resolveSupportedEmotion("happy"))
+        assertEquals("serieux", SpriteAvatarRenderer.resolveSupportedEmotion("Sérieux"))
+        assertEquals("calme", SpriteAvatarRenderer.resolveSupportedEmotion("peaceful"))
+        assertEquals("colere", SpriteAvatarRenderer.resolveSupportedEmotion("colère"))
+        assertEquals("fatigue", SpriteAvatarRenderer.resolveSupportedEmotion("yawn"))
+        assertEquals("normal", SpriteAvatarRenderer.resolveSupportedEmotion("normal"))
+        assertEquals("normal", SpriteAvatarRenderer.resolveSupportedEmotion("unknown_mood"))
     }
 }

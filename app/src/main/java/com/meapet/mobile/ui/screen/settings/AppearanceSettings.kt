@@ -73,6 +73,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.meapet.mobile.R
 import com.meapet.mobile.core.LocaleHelper
+import com.meapet.mobile.live2d.AvatarRenderType
+import com.meapet.mobile.live2d.Live2dModelStore
 import com.meapet.mobile.ui.theme.THEME_PRESETS
 import com.meapet.mobile.viewmodel.SettingsUiState
 import com.meapet.mobile.viewmodel.SettingsViewModel
@@ -175,21 +177,36 @@ internal fun Live2dModelSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (model.isBuiltIn) {
+                        val label = when {
+                            model.id == Live2dModelStore.ALITA_SPRITE_MODEL_ID ->
+                                stringResource(R.string.live2d_alita_builtin_name)
+                            model.isBuiltIn ->
                                 stringResource(R.string.live2d_builtin_name)
-                            } else {
+                            else ->
                                 model.displayName
-                            },
+                        }
+                        Text(
+                            text = label,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (isActive) {
+                        if (isActive || model.renderType == AvatarRenderType.SPRITE_2D) {
+                            val subText = buildString {
+                                if (isActive) append(stringResource(R.string.live2d_active_badge))
+                                if (model.renderType == AvatarRenderType.SPRITE_2D) {
+                                    if (isNotEmpty()) append(" · ")
+                                    append(stringResource(R.string.live2d_sprite_2d_badge))
+                                }
+                            }
                             Text(
-                                text = stringResource(R.string.live2d_active_badge),
+                                text = subText,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                color = if (isActive) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT)
+                                }
                             )
                         }
                     }

@@ -17,21 +17,29 @@ import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipInputStream
 
+enum class AvatarRenderType {
+    LIVE2D,
+    SPRITE_2D
+}
+
 /**
- * Runtime specification of a Live2D model (either built-in Mea or an imported external model).
+ * Runtime specification of an avatar model (built-in Mea Live2D, built-in Alita 2D sprites,
+ * or an imported external Live2D model).
  *
- * @property id Empty string for built-in Mea, UUID string for imported models.
+ * @property id Empty string for built-in Mea, [Live2dModelStore.ALITA_SPRITE_MODEL_ID] for built-in Alita 2D, UUID string for imported models.
  * @property displayName Human-readable model name shown in settings.
  * @property dirPath Directory path ending with `/`. Asset-relative for built-in, absolute filesystem path for imported.
- * @property modelJsonName Relative filename of the `.model3.json` inside [dirPath].
+ * @property modelJsonName Relative filename of the `.model3.json` (or default PNG) inside [dirPath].
  * @property isBuiltIn True when using bundled APK assets.
+ * @property renderType Rendering pipeline used for this avatar ([AvatarRenderType.LIVE2D] or [AvatarRenderType.SPRITE_2D]).
  */
 data class Live2dModelSpec(
     val id: String,
     val displayName: String,
     val dirPath: String,
     val modelJsonName: String,
-    val isBuiltIn: Boolean = false
+    val isBuiltIn: Boolean = false,
+    val renderType: AvatarRenderType = AvatarRenderType.LIVE2D
 )
 
 @Serializable
@@ -52,7 +60,7 @@ sealed interface Live2dImportResult {
 }
 
 /**
- * Manages built-in and externally imported (`.zip`) Live2D Cubism models in app-private storage.
+ * Manages built-in and externally imported (`.zip`) avatar models in app-private storage.
  */
 class Live2dModelStore(
     private val filesDir: File,
@@ -70,12 +78,24 @@ class Live2dModelStore(
         private const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
         private const val MAX_TOTAL_BYTES = 200L * 1024 * 1024
 
+        const val ALITA_SPRITE_MODEL_ID = "builtin_alita_sprite_2d"
+
         val BUILT_IN_MODEL = Live2dModelSpec(
             id = "",
             displayName = "Mea",
             dirPath = "live2d/mea_live2d/",
             modelJsonName = "mea.model3.json",
-            isBuiltIn = true
+            isBuiltIn = true,
+            renderType = AvatarRenderType.LIVE2D
+        )
+
+        val ALITA_SPRITE_MODEL = Live2dModelSpec(
+            id = ALITA_SPRITE_MODEL_ID,
+            displayName = "Alita (2D)",
+            dirPath = "sprites/alita/",
+            modelJsonName = "normal.png",
+            isBuiltIn = true,
+            renderType = AvatarRenderType.SPRITE_2D
         )
     }
 
@@ -83,11 +103,12 @@ class Live2dModelStore(
         val imported = listImportedInternal()
             .sortedBy { it.first.createdAt }
             .map { it.second }
-        return listOf(BUILT_IN_MODEL) + imported
+        return listOf(BUILT_IN_MODEL, ALITA_SPRITE_MODEL) + imported
     }
 
     fun findById(id: String): Live2dModelSpec {
         if (id.isBlank()) return BUILT_IN_MODEL
+        if (id == ALITA_SPRITE_MODEL_ID) return ALITA_SPRITE_MODEL
         return listModels().firstOrNull { it.id == id } ?: BUILT_IN_MODEL
     }
 
