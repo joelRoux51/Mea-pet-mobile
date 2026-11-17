@@ -150,6 +150,54 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         return motionManager.startMotionPriority(motion, priority)
     }
 
+    /**
+     * Déclenche directement une expression `.exp3.json` chargée par son nom.
+     */
+    fun setExpression(expressionId: String): Boolean {
+        val key = expressions.keys.firstOrNull { it.equals(expressionId, ignoreCase = true) }
+            ?: return false
+        val motion = expressions[key] ?: return false
+        if (Live2dDefine.DEBUG_LOG_ENABLE) {
+            CubismFramework.coreLogFunction("[APP] set expression: $key")
+        }
+        expressionManager.startMotionPriority(motion, Live2dDefine.Priority.FORCE)
+        return true
+    }
+
+    /**
+     * Applique l'expression correspondant à une émotion (`joie`, `serieux`, `calme`,
+     * `colere`, `fatigue`, `normal`) ou à un nom de fichier `.exp3.json`.
+     * Doit être appelée depuis le thread OpenGL.
+     */
+    fun setExpressionForEmotion(emotion: String): Boolean {
+        val resolvedKey = Live2dEmotion.resolveExpressionKey(emotion, expressions.keys)
+        if (resolvedKey != null) {
+            return setExpression(resolvedKey)
+        }
+        if (Live2dEmotion.isDefaultEmotion(emotion)) {
+            resetExpression()
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Réinitialise l'expression active vers l'expression par défaut (`normal` ou état neutre).
+     */
+    fun resetExpression() {
+        val defaultKey = Live2dEmotion.resolveExpressionKey(
+            Live2dEmotion.EMOTION_NORMAL,
+            expressions.keys
+        )
+        if (defaultKey != null) {
+            setExpression(defaultKey)
+        } else {
+            expressionManager.stopAllMotions()
+        }
+    }
+
+    fun getAvailableExpressions(): Set<String> = expressions.keys.toSet()
+
     fun draw(matrix: CubismMatrix44) {
         if (model == null) {
             try {
@@ -255,9 +303,14 @@ class Live2dModel(modelDirName: String) : CubismUserModel() {
         val expCount = ms.expressionCount
         if (expCount > 0) {
             for (i in 0 until expCount) {
-                val name = ms.getExpressionName(i)
+                val rawName = ms.getExpressionName(i).trim()
                 val expFile = ms.getExpressionFileName(i)
                 if (expFile.isEmpty()) continue
+                val fallbackName = expFile.substringAfterLast('/')
+                    .removeSuffix(".exp3.json")
+                    .trim()
+                val name = rawName.ifEmpty { fallbackName }
+                if (name.isEmpty()) continue
                 val buffer = Live2dPal.loadFileAsBytes(joinModelPath(expFile))
                 if (buffer.isNotEmpty()) {
                     loadExpression(buffer)?.let { expressions[name] = it }

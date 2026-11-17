@@ -30,6 +30,7 @@ class LocalWebhookServerTest {
     private lateinit var notificationHelper: TelegramNotificationHelper
     private lateinit var scope: CoroutineScope
     private lateinit var server: LocalWebhookServer
+    private val triggeredEmotions = mutableListOf<String>()
     private var port: Int = 0
 
     @Before
@@ -38,13 +39,15 @@ class LocalWebhookServerTest {
         conversationManager = ConversationManager()
         notificationHelper = mock()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        triggeredEmotions.clear()
         server = LocalWebhookServer(
             settingsManager = settingsManager,
             conversationManager = conversationManager,
             notificationHelper = notificationHelper,
             scope = scope,
             port = 0,
-            host = "127.0.0.1"
+            host = "127.0.0.1",
+            onEmotionReceived = { emotion -> synchronized(triggeredEmotions) { triggeredEmotions.add(emotion) } }
         )
         port = server.startListening()
     }
@@ -142,6 +145,45 @@ class LocalWebhookServerTest {
 
         val (notFoundStatus, _) = postJson("/other", """{"text":"hi"}""")
         assertEquals(404, notFoundStatus)
+    }
+
+    @Test
+    fun `POST notify extracts EMOTION tag triggers expression and strips tag from text`() = runBlocking {
+        val emitted = mutableListOf<WebhookMessageEvent>()
+        val collector = launch {
+            emitted.add(withTimeout(3_000) { server.events.first() })
+        }
+        kotlinx.coroutines.delay(50)
+
+        val (status, body) = postJson(
+            "/notify",
+            """{"text":"[EMOTION: joie] C'est l'heure de boire de l'eau !"}"""
+        )
+
+        assertEquals(200, status)
+        assertTrue(body.contains("\"ok\":true"))
+        collector.join()
+
+        val expectedClean = "C'est l'heure de boire de l'eau !"
+        assertEquals(expectedClean, emitted[0].text)
+        assertEquals("joie", emitted[0].emotion)
+        assertEquals(listOf("joie"), triggeredEmotions)
+
+        val history = conversationManager.getMessages()
+        assertEquals(1, history.size)
+        assertEquals(expectedClean, history[0].content)
+        verify(notificationHelper).showNotification(LocalWebhookServer.DEFAULT_SENDER, expectedClean)
+    }
+
+    @Test
+    fun `POST notify with only EMOTION tag triggers expression without adding empty bubble`() = runBlocking {
+        val (status, body) = postJson("/notify", """{"text":"[emotion : colère]"}""")
+
+        assertEquals(200, status)
+        assertTrue(body.contains("\"ok\":true"))
+        assertEquals(listOf("colere"), triggeredEmotions)
+        assertEquals(0, conversationManager.getMessages().size)
+        verify(notificationHelper, never()).showNotification(org.mockito.kotlin.any(), org.mockito.kotlin.any())
     }
 
     @Test

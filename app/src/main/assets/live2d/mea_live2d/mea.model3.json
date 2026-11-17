@@ -9,6 +9,32 @@
       "textures/texture_01.png"
     ],
     "Physics": "mea.physics3.json",
+    "Expressions": [
+      {
+        "Name": "joie",
+        "File": "expressions/joie.exp3.json"
+      },
+      {
+        "Name": "serieux",
+        "File": "expressions/serieux.exp3.json"
+      },
+      {
+        "Name": "calme",
+        "File": "expressions/calme.exp3.json"
+      },
+      {
+        "Name": "colere",
+        "File": "expressions/colere.exp3.json"
+      },
+      {
+        "Name": "fatigue",
+        "File": "expressions/fatigue.exp3.json"
+      },
+      {
+        "Name": "normal",
+        "File": "expressions/normal.exp3.json"
+      }
+    ],
     "Motions": {
       "Idle": [
         {

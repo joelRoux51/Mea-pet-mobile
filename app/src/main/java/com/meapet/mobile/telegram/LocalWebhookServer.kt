@@ -4,6 +4,8 @@ import android.util.Log
 import com.meapet.mobile.chat.ChatMessage
 import com.meapet.mobile.chat.ChatRole
 import com.meapet.mobile.chat.ConversationManager
+import com.meapet.mobile.live2d.Live2dEmotion
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.settings.SettingsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +40,8 @@ data class WebhookNotifyPayload(
 data class WebhookMessageEvent(
     val sender: String,
     val text: String,
-    val message: ChatMessage
+    val message: ChatMessage,
+    val emotion: String? = null
 )
 
 /**
@@ -46,14 +49,17 @@ data class WebhookMessageEvent(
  *
  * Listens on `0.0.0.0:8081` (by default) and accepts `POST /notify` with a JSON body:
  * ```json
- * {"text": "C'est l'heure de boire de l'eau !"}
+ * {"text": "[EMOTION: joie] C'est l'heure de boire de l'eau !"}
  * ```
  * Optional `"sender"` field can override the default sender label (`"Alita"`).
+ * If an `[EMOTION: nom]` tag is present in `"text"`, it is extracted and stripped from the
+ * displayed message, and the matching `.exp3.json` expression is triggered on the Live2D model.
  *
  * On valid receipt, it:
- * 1) Persists the message in [ConversationManager] (visible in chat history),
- * 2) Emits a [WebhookMessageEvent] for Live2D dialogue bubbles (main screen + floating overlay),
- * 3) Displays an Android push notification via [TelegramNotificationHelper].
+ * 1) Triggers the Live2D facial expression if `[EMOTION: ...]` is present,
+ * 2) Persists the clean message in [ConversationManager] (visible in chat history),
+ * 3) Emits a [WebhookMessageEvent] for Live2D dialogue bubbles (main screen + floating overlay),
+ * 4) Displays an Android push notification via [TelegramNotificationHelper].
  */
 class LocalWebhookServer(
     private val settingsManager: SettingsManager,
@@ -61,7 +67,10 @@ class LocalWebhookServer(
     private val notificationHelper: TelegramNotificationHelper,
     private val scope: CoroutineScope,
     private val port: Int = DEFAULT_PORT,
-    private val host: String = DEFAULT_HOST
+    private val host: String = DEFAULT_HOST,
+    private val onEmotionReceived: (String) -> Unit = { emotion ->
+        Live2dManager.getInstance().triggerEmotion(emotion)
+    }
 ) {
     companion object {
         private const val TAG = "LocalWebhookServer"
@@ -261,14 +270,23 @@ class LocalWebhookServer(
                 return
             }
 
-            val cleanText = payload.text.trim()
-            if (cleanText.isEmpty()) {
+            val rawText = payload.text
+            if (rawText.isBlank()) {
+                writeJsonResponse(output, 400, "Bad Request", """{"ok":false,"error":"Missing 'text' field"}""")
+                return
+            }
+
+            val parsedEmotion = Live2dEmotion.extractFromText(rawText)
+            val cleanText = parsedEmotion.cleanText
+            val emotion = parsedEmotion.emotion
+
+            if (cleanText.isEmpty() && emotion == null) {
                 writeJsonResponse(output, 400, "Bad Request", """{"ok":false,"error":"Missing 'text' field"}""")
                 return
             }
 
             val senderName = payload.sender?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_SENDER
-            dispatchIncomingNotification(senderName, cleanText)
+            dispatchIncomingNotification(senderName, cleanText, emotion)
             writeJsonResponse(output, 200, "OK", """{"ok":true}""")
         } catch (e: Exception) {
             Log.w(TAG, "Error handling webhook client: ${e.message}")
@@ -285,7 +303,17 @@ class LocalWebhookServer(
         }
     }
 
-    private fun dispatchIncomingNotification(senderName: String, cleanText: String) {
+    private fun dispatchIncomingNotification(
+        senderName: String,
+        cleanText: String,
+        emotion: String?
+    ) {
+        if (emotion != null) {
+            runCatching { onEmotionReceived(emotion) }
+                .onFailure { Log.w(TAG, "Failed to apply Live2D emotion '$emotion': ${it.message}") }
+        }
+        if (cleanText.isEmpty()) return
+
         val chatMessage = ChatMessage(
             role = ChatRole.assistant,
             content = cleanText,
@@ -298,7 +326,8 @@ class LocalWebhookServer(
             WebhookMessageEvent(
                 sender = senderName,
                 text = cleanText,
-                message = chatMessage
+                message = chatMessage,
+                emotion = emotion
             )
         )
     }

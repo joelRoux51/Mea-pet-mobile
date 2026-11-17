@@ -38,6 +38,7 @@ class Live2dOverlayRenderer(
     private var winHeight = 0
     private var modelLoaded = false
     private var loadedSpec: Live2dModelSpec? = null
+    private var lastAppliedEmotionSequence = 0L
 
     /**
      * 悬浮窗整体不透明度（0.0~1.0）。
@@ -154,6 +155,13 @@ class Live2dOverlayRenderer(
                 mm.setHeight(2.0f * zoom)
                 projection.scale(1.0f / aspect, 1.0f)
                 projection.translateRelative(0f, -0.35f)
+            }
+
+            Live2dManager.getInstance().latestEmotionRequest()?.let { req ->
+                if (req.sequence != lastAppliedEmotionSequence) {
+                    lastAppliedEmotionSequence = req.sequence
+                    m.setExpressionForEmotion(req.emotion)
+                }
             }
 
             m.update()

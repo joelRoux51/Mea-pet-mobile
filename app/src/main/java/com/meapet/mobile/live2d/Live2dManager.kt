@@ -5,6 +5,8 @@ import com.live2d.sdk.cubism.framework.math.CubismMatrix44
 import com.live2d.sdk.cubism.framework.rendering.android.CubismOffscreenManagerAndroid
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Singleton manager that owns the Live2D model and drives update/draw.
@@ -57,6 +59,28 @@ class Live2dManager private constructor() {
     private var modelLoaded = false
 
     private val projection = CubismMatrix44.create()
+
+    data class EmotionRequest(val sequence: Long, val emotion: String)
+
+    private val emotionSequence = AtomicLong(0L)
+    private val latestEmotionRef = AtomicReference<EmotionRequest?>(null)
+
+    @Volatile
+    private var lastAppliedMainSequence = 0L
+
+    /**
+     * Planifie l'application d'une expression Live2D (`.exp3.json`) sur le thread OpenGL.
+     * Peut être appelée depuis n'importe quel thread (ex. serveur Webhook sur Dispatchers.IO).
+     */
+    fun triggerEmotion(emotion: String) {
+        val cleaned = emotion.trim()
+        if (cleaned.isEmpty()) return
+        val seq = emotionSequence.incrementAndGet()
+        latestEmotionRef.set(EmotionRequest(sequence = seq, emotion = cleaned))
+    }
+
+    /** Retourne la dernière demande d'émotion en attente (partagée entre l'écran principal et la fenêtre flottante). */
+    fun latestEmotionRequest(): EmotionRequest? = latestEmotionRef.get()
 
     fun setActiveModel(spec: Live2dModelSpec): Boolean {
         if (spec == activeSpec) return false
@@ -136,6 +160,13 @@ class Live2dManager private constructor() {
         }
 
         delegate.view.preModelDraw(m)
+        latestEmotionRef.get()?.let { req ->
+            if (req.sequence != lastAppliedMainSequence) {
+                lastAppliedMainSequence = req.sequence
+                val applied = m.setExpressionForEmotion(req.emotion)
+                Log.d(TAG, "Emotion '${req.emotion}' applied on main model: $applied")
+            }
+        }
         m.update()
         m.draw(projection)
         delegate.view.postModelDraw(m)
