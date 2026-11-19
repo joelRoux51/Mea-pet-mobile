@@ -14,6 +14,7 @@ import com.meapet.mobile.live2d.Live2dModelSpec
 import com.meapet.mobile.live2d.Live2dPal
 import com.meapet.mobile.live2d.Live2dSpriteShader
 import com.meapet.mobile.live2d.Live2dTextureManager
+import com.meapet.mobile.live2d.Sprite3dShader
 import com.meapet.mobile.live2d.SpriteAvatarRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -37,6 +38,7 @@ class Live2dOverlayRenderer(
     private var model: Live2dModel? = null
     private var textureManager: Live2dTextureManager? = null
     private var spriteShader: Live2dSpriteShader? = null
+    private var sprite3dShader: Sprite3dShader? = null
     private val spriteRenderer = SpriteAvatarRenderer()
     private val projection = CubismMatrix44.create()
     private var winWidth = 0
@@ -96,6 +98,8 @@ class Live2dOverlayRenderer(
         textureManager = Live2dTextureManager()
         spriteShader?.close()
         spriteShader = Live2dSpriteShader()
+        sprite3dShader?.close()
+        sprite3dShader = Sprite3dShader()
         alphaCompositor.onContextCreated()
         // surface 重建时旧 GL 上下文已销毁（GL 资源随之释放），
         // 但 moc/model 的 native 内存仍需显式释放后再重新加载
@@ -140,6 +144,7 @@ class Live2dOverlayRenderer(
                     viewWidth = winWidth,
                     viewHeight = winHeight,
                     shaderProgramId = spriteShader?.programId ?: 0,
+                    shader3d = sprite3dShader,
                     dragX = 0f,
                     dragY = 0f,
                     opacity = opacity,

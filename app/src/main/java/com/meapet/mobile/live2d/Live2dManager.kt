@@ -18,6 +18,7 @@ class Live2dManager private constructor() {
 
         private const val MODEL_DIR_NAME = "live2d/mea_live2d"
         private const val MODEL_JSON_NAME = "mea.model3.json"
+        private const val TAP_AUTO_CALM_MS = 7_500L
 
         @Volatile
         private var instance: Live2dManager? = null
@@ -76,6 +77,12 @@ class Live2dManager private constructor() {
     @Volatile
     private var lastAppliedMainSequence = 0L
 
+    @Volatile
+    private var lastTapEmotionSequence = 0L
+
+    @Volatile
+    private var lastTapEmotionMs = 0L
+
     /**
      * Planifie l'application d'une expression Live2D (`.exp3.json`) sur le thread OpenGL.
      * Peut être appelée depuis n'importe quel thread (ex. serveur Webhook sur Dispatchers.IO).
@@ -87,8 +94,34 @@ class Live2dManager private constructor() {
         latestEmotionRef.set(EmotionRequest(sequence = seq, emotion = cleaned))
     }
 
+    /**
+     * Déclenche une émotion liée aux tapotements répétés (s'apaise automatiquement
+     * après un délai d'inactivité sans jamais écraser une émotion venue du chat/webhook).
+     */
+    fun triggerTapEmotion(emotion: String) {
+        val cleaned = emotion.trim()
+        if (cleaned.isEmpty()) return
+        val seq = emotionSequence.incrementAndGet()
+        lastTapEmotionSequence = seq
+        lastTapEmotionMs = android.os.SystemClock.uptimeMillis()
+        latestEmotionRef.set(EmotionRequest(sequence = seq, emotion = cleaned))
+    }
+
     /** Retourne la dernière demande d'émotion en attente (partagée entre l'écran principal et la fenêtre flottante). */
     fun latestEmotionRequest(): EmotionRequest? = latestEmotionRef.get()
+
+    private fun checkAutoCalmFromTap() {
+        val tapSeq = lastTapEmotionSequence
+        val tapMs = lastTapEmotionMs
+        if (tapSeq == 0L || tapMs == 0L) return
+        val req = latestEmotionRef.get() ?: return
+        if (req.sequence != tapSeq || req.emotion == Live2dEmotion.EMOTION_NORMAL) return
+        if (android.os.SystemClock.uptimeMillis() - tapMs >= TAP_AUTO_CALM_MS) {
+            lastTapEmotionSequence = 0L
+            lastTapEmotionMs = 0L
+            triggerEmotion(Live2dEmotion.EMOTION_NORMAL)
+        }
+    }
 
     fun setActiveModel(spec: Live2dModelSpec): Boolean {
         if (spec == activeSpec) return false
@@ -165,18 +198,21 @@ class Live2dManager private constructor() {
         val height = delegate.windowHeight
         if (width <= 0 || height <= 0) return
 
+        checkAutoCalmFromTap()
+
         if (loadedSpec?.renderType == AvatarRenderType.SPRITE_2D) {
             latestEmotionRef.get()?.let { req ->
                 if (req.sequence != lastAppliedMainSequence) {
                     lastAppliedMainSequence = req.sequence
                     spriteRenderer.setEmotion(req.emotion)
-                    Log.d(TAG, "Emotion '${req.emotion}' applied on 2D sprite avatar")
+                    Log.d(TAG, "Emotion '${req.emotion}' applied on 3D layered sprite avatar")
                 }
             }
             spriteRenderer.draw(
                 viewWidth = width,
                 viewHeight = height,
                 shaderProgramId = delegate.view.spriteShaderProgramId,
+                shader3d = delegate.view.sprite3dShader,
                 dragX = dragX,
                 dragY = dragY,
                 opacity = 1f,

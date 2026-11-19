@@ -24,6 +24,8 @@ class Live2dView : AutoCloseable {
     private val renderingBuffer = CubismRenderTargetAndroid()
     private var renderingSprite: Live2dSprite? = null
     private var spriteShader: Live2dSpriteShader? = null
+    var sprite3dShader: Sprite3dShader? = null
+        private set
 
     val spriteShaderProgramId: Int
         get() = spriteShader?.programId ?: 0
@@ -33,6 +35,8 @@ class Live2dView : AutoCloseable {
         renderingSprite = null
         spriteShader?.close()
         spriteShader = null
+        sprite3dShader?.close()
+        sprite3dShader = null
     }
 
     fun initialize() {
@@ -69,7 +73,10 @@ class Live2dView : AutoCloseable {
             Live2dDefine.MaxLogicalView.TOP
         )
 
+        spriteShader?.close()
         spriteShader = Live2dSpriteShader()
+        sprite3dShader?.close()
+        sprite3dShader = Sprite3dShader()
     }
 
     fun initializeSprite() {

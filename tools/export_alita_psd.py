@@ -68,32 +68,176 @@ def save_rgba_png(rgb: bytearray, alpha: bytearray, out_path: Path) -> None:
     )
 
 
-def remove_bg_and_header(src_jpg: Path, out_png: Path, has_interior_arm_gaps: bool) -> None:
-    """Supprime l'en-tête texte éventuel et rend le fond blanc transparent."""
-    cmd = [
-        "convert",
-        str(src_jpg),
-        "-alpha", "set",
-        # Efface la zone d'en-tête texte en haut à gauche sans toucher les mèches (x >= 420 en haut, >= 340 en bas)
-        "-fill", "white",
-        "-draw", "rectangle 0,0 415,62",
-        "-draw", "rectangle 0,62 390,74",
-        "-draw", "rectangle 0,74 320,145",
-        "-fuzz", "7%",
-        "-fill", "none",
-        "-draw", "color 0,0 floodfill",
-        "-draw", "color 895,0 floodfill",
-        "-draw", "color 0,1199 floodfill",
-        "-draw", "color 895,1199 floodfill",
+def erase_header_text_on_rgb(rgb: bytearray) -> None:
+    """Efface la zone d'en-tête texte éventuelle en haut à gauche sans toucher les mèches."""
+    rects = [
+        (0, 0, 415, 62),
+        (0, 62, 390, 74),
+        (0, 74, 320, 145),
     ]
-    if has_interior_arm_gaps:
-        # Comble les intervalles blancs entre bras et hanches
-        cmd.extend([
-            "-draw", "color 315,650 floodfill",
-            "-draw", "color 580,650 floodfill",
-        ])
-    cmd.extend(["-type", "TrueColorAlpha", str(out_png)])
-    run(cmd)
+    for x0, y0, x1, y1 in rects:
+        for y in range(y0, y1 + 1):
+            row = y * W
+            for x in range(x0, x1 + 1):
+                o = (row + x) * 3
+                rgb[o] = 255
+                rgb[o + 1] = 255
+                rgb[o + 2] = 255
+
+
+def load_jpg_rgb(src_jpg: Path) -> bytearray:
+    pam = subprocess.check_output(
+        ["convert", str(src_jpg), "-colorspace", "sRGB", "-type", "TrueColor", "-depth", "8", "pam:-"]
+    )
+    end_hdr = pam.find(b"ENDHDR\n") + len(b"ENDHDR\n")
+    return bytearray(pam[end_hdr:])
+
+
+def is_bg_white(r: int, g: int, b: int, lum_thresh: int = 236, chroma_thresh: int = 12) -> bool:
+    mx = max(r, g, b)
+    mn = min(r, g, b)
+    return mx >= lum_thresh and mn >= (lum_thresh - 8) and (mx - mn) <= chroma_thresh
+
+
+def floodfill_transparent(rgb: bytearray, alpha: bytearray, seeds: list[tuple[int, int]], lum_thresh: int = 236) -> None:
+    from collections import deque
+
+    q = deque()
+    for sx, sy in seeds:
+        if 0 <= sx < W and 0 <= sy < H:
+            i = sy * W + sx
+            if alpha[i] == 0:
+                continue
+            o = i * 3
+            if is_bg_white(rgb[o], rgb[o + 1], rgb[o + 2], lum_thresh=lum_thresh):
+                alpha[i] = 0
+                q.append((sx, sy))
+
+    while q:
+        cx, cy = q.popleft()
+        for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+            if 0 <= nx < W and 0 <= ny < H:
+                ni = ny * W + nx
+                if alpha[ni] != 0:
+                    no = ni * 3
+                    if is_bg_white(rgb[no], rgb[no + 1], rgb[no + 2], lum_thresh=lum_thresh):
+                        alpha[ni] = 0
+                        q.append((nx, ny))
+
+
+def defringe_white_halo(rgb: bytearray, alpha: bytearray) -> None:
+    """
+    Supprime le halo gris-blanc d'anti-aliasing autour des contours sombres
+    (cheveux, combinaison, armure) en convertissant la luminance claire de bordure
+    en transparence douce teintée vers le trait sombre adjacent.
+    """
+    # Passe sur 2 anneaux successifs depuis les pixels transparents
+    for ring in range(2):
+        # Snapshot de l'alpha courant pour que la passe soit isotrope
+        snap_a = bytes(alpha)
+        candidates: list[tuple[int, int, int, tuple[int, int, int]]] = []
+
+        for y in range(H):
+            row = y * W
+            for x in range(W):
+                i = row + x
+                if snap_a[i] == 0:
+                    continue
+
+                # Touche un pixel transparent (4-connexité)
+                touches_bg = False
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                    if 0 <= nx < W and 0 <= ny < H and snap_a[ny * W + nx] == 0:
+                        touches_bg = True
+                        break
+                if not touches_bg:
+                    continue
+
+                o = i * 3
+                r, g, b = rgb[o], rgb[o + 1], rgb[o + 2]
+                mx = max(r, g, b)
+                mn = min(r, g, b)
+                lum = (r + g + b) / 3.0
+
+                # Ne traite que les pixels neutres clairs issus du mélange trait sombre + fond blanc
+                if (mx - mn) > 22 or lum < 110.0:
+                    continue
+
+                # Cherche le trait sombre le plus proche dans un voisinage 5x5
+                ink_r = ink_g = ink_b = 0
+                ink_cnt = 0
+                min_ink_lum = 255.0
+                for dy in range(-2, 3):
+                    yy = y + dy
+                    if yy < 0 or yy >= H:
+                        continue
+                    for dx in range(-2, 3):
+                        xx = x + dx
+                        if xx < 0 or xx >= W or (dx == 0 and dy == 0):
+                            continue
+                        ni = yy * W + xx
+                        if snap_a[ni] < 200:
+                            continue
+                        no = ni * 3
+                        nr, ng, nb = rgb[no], rgb[no + 1], rgb[no + 2]
+                        nlum = (nr + ng + nb) / 3.0
+                        if nlum < 115.0:
+                            ink_r += nr
+                            ink_g += ng
+                            ink_b += nb
+                            ink_cnt += 1
+                            if nlum < min_ink_lum:
+                                min_ink_lum = nlum
+
+                if ink_cnt == 0:
+                    continue
+
+                avg_ink = (ink_r // ink_cnt, ink_g // ink_cnt, ink_b // ink_cnt)
+                ink_lum = (avg_ink[0] + avg_ink[1] + avg_ink[2]) / 3.0
+                denom = max(1.0, 245.0 - ink_lum)
+                cov = max(0.0, min(1.0, (242.0 - lum) / denom))
+                # Sur l'anneau le plus externe (ring 0), coupe les franges quasi-blanches
+                if ring == 0 and lum >= 218.0:
+                    cov = 0.0
+                new_a = int(round(cov * snap_a[i]))
+                candidates.append((i, x, new_a, avg_ink))
+
+        for i, _x, new_a, ink_col in candidates:
+            o = i * 3
+            alpha[i] = new_a
+            if new_a > 0:
+                # Re-colore le pixel semi-transparent avec le ton du trait pour éviter tout liseré blanc
+                rgb[o] = ink_col[0]
+                rgb[o + 1] = ink_col[1]
+                rgb[o + 2] = ink_col[2]
+            else:
+                rgb[o] = 0
+                rgb[o + 1] = 0
+                rgb[o + 2] = 0
+
+
+INTERIOR_GAP_SEEDS: dict[str, list[tuple[int, int]]] = {
+    "normal": [(449, 1086), (315, 650), (580, 650), (345, 655), (553, 655), (325, 268), (572, 268)],
+    "joie": [(449, 1086), (315, 650), (580, 650), (345, 655), (553, 655), (326, 268), (572, 268)],
+    "serieux": [(449, 1086), (326, 268), (572, 268)],
+    "colere": [(449, 1086), (326, 268), (572, 268)],
+    "calme": [(449, 1086), (318, 590), (579, 590), (346, 670), (552, 669), (327, 268), (573, 268)],
+    "fatigue": [(449, 1086), (580, 650), (306, 543), (345, 655), (553, 655), (326, 268), (573, 268)],
+}
+
+
+def remove_bg_and_header(key: str, src_jpg: Path, out_png: Path) -> None:
+    """Supprime l'en-tête texte, le fond blanc extérieur/intérieur et le halo blanc des contours."""
+    rgb = load_jpg_rgb(src_jpg)
+    erase_header_text_on_rgb(rgb)
+    alpha = bytearray([255] * (W * H))
+
+    outer_seeds = [(0, 0), (W - 1, 0), (0, H - 1), (W - 1, H - 1)]
+    floodfill_transparent(rgb, alpha, outer_seeds, lum_thresh=232)
+    floodfill_transparent(rgb, alpha, INTERIOR_GAP_SEEDS.get(key, [(449, 1086)]), lum_thresh=216)
+    defringe_white_halo(rgb, alpha)
+
+    save_rgba_png(rgb, alpha, out_png)
 
 
 def is_skin_pixel(r: int, g: int, b: int, a: int) -> bool:
@@ -149,8 +293,7 @@ def main() -> None:
     sprite_paths: dict[str, Path] = {}
     for key, src in SOURCE_IMAGES.items():
         out_png = SPRITES_DIR / f"alita_{key}.png"
-        has_gaps = key in ("normal", "joie", "fatigue")
-        remove_bg_and_header(src, out_png, has_interior_arm_gaps=has_gaps)
+        remove_bg_and_header(key, src, out_png)
         sprite_paths[key] = out_png
 
     # Charge normal, calme, joie, colere pour extraire les calques mobiles alignés
@@ -217,6 +360,11 @@ def main() -> None:
     bouche_colere_rgb, bouche_colere_a = make_empty()
 
     # 2. Séparation Corps / Bras / Tête / Mèches / Visage depuis alita_normal
+    # Note : on ajoute une marge de recouvrement (underfill) derrière les mèches et les bras
+    # afin qu'aucune fissure transparente n'apparaisse lors des mouvements 3D / physique des cheveux.
+    hair_bg_color = (34, 38, 44)
+    dark_suit_color = (36, 40, 46)
+
     for y in range(H):
         for x in range(W):
             i = y * W + x
@@ -230,17 +378,24 @@ def main() -> None:
             if y >= 355:
                 if point_in_poly(x, y, left_arm_poly):
                     copy_pixel(n_rgb, n_alpha, larm_rgb, larm_a, x, y)
+                    # Légère sous-couche sombre sous la bordure interne du bras (évite tout jour si le bras respire)
+                    if point_in_poly(x + 10, y, left_arm_poly) is False:
+                        set_pixel(torse_rgb, torse_a, x, y, dark_suit_color, a)
                 elif point_in_poly(x, y, right_arm_poly):
                     copy_pixel(n_rgb, n_alpha, rarm_rgb, rarm_a, x, y)
+                    if point_in_poly(x - 10, y, right_arm_poly) is False:
+                        set_pixel(torse_rgb, torse_a, x, y, dark_suit_color, a)
                 else:
                     copy_pixel(n_rgb, n_alpha, torse_rgb, torse_a, x, y)
                 continue
 
-            # B) Zone Cou / Col (y 312..354) : menton & cou sur tete, col d'armure sur torse
+            # B) Zone Cou / Col (y 322..354) : menton & cou sur tete, col d'armure sur torse
             if y >= 322:
                 lum = (r + g + b) / 3.0
                 if 412 <= x <= 484 and (lum < 110 or y < 332):
                     copy_pixel(n_rgb, n_alpha, tete_rgb, tete_a, x, y)
+                    # Prolonge un léger raccord sombre sous le col du torse
+                    set_pixel(torse_rgb, torse_a, x, y, dark_suit_color, a)
                 else:
                     copy_pixel(n_rgb, n_alpha, torse_rgb, torse_a, x, y)
                 continue
@@ -300,18 +455,21 @@ def main() -> None:
                 continue
 
             # Mèches / Cheveux vs Tête
-            # Les cheveux sombres (haut du crâne y < 188 ou sur les côtés x < 392 / x > 504 ou frange)
             if y < 188 or ((x < 394 or x > 502) and y < 312) or (y < 212 and is_hair_pixel(r, g, b, a)):
                 if is_hair_pixel(r, g, b, a) or y < 180 or x < 388 or x > 508:
                     copy_pixel(n_rgb, n_alpha, meches_rgb, meches_a, x, y)
                     # Sous la frange centrale du front, place un fond peau continu à l'intérieur du visage
                     if 402 <= x <= 494 and 168 <= y <= 212:
                         set_pixel(tete_rgb, tete_a, x, y, skin_color, 255)
+                    # Sous les tempes / bords des mèches, place un léger fond capillaire sombre
+                    # pour masquer tout décalage lors de l'oscillation 3D des cheveux
+                    elif 372 <= x <= 524 and 130 <= y <= 315:
+                        set_pixel(tete_rgb, tete_a, x, y, hair_bg_color, a)
                     continue
 
             copy_pixel(n_rgb, n_alpha, tete_rgb, tete_a, x, y)
 
-    # 3. Paupières fermées depuis alita_calme (sans écraser la peau environnante)
+    # 3. Paupières fermées depuis alita_calme (avec transparence douce sur les bords)
     for box, dst_rgb, dst_a in [
         (L_EYE, lpaup_rgb, lpaup_a),
         (R_EYE, rpaup_rgb, rpaup_a),
@@ -333,6 +491,29 @@ def main() -> None:
                 o = i * 3
                 if src_a[i] > 0 and not is_skin_pixel(src_rgb[o], src_rgb[o + 1], src_rgb[o + 2], src_a[i]):
                     copy_pixel(src_rgb, src_a, dst_rgb, dst_a, x, y)
+
+    # 4b. Extrait les corps sans mèches (pose_*_body.png) pour que les cheveux bougent sur TOUTES les émotions
+    for emo_key in ("joie", "serieux", "colere", "calme", "fatigue"):
+        p_rgb, p_alpha = load_ppm_rgba(sprite_paths[emo_key])
+        for y in range(60, 322):
+            row = y * W
+            for x in range(310, 590):
+                i = row + x
+                if meches_a[i] > 180:
+                    if 402 <= x <= 494 and 168 <= y <= 212:
+                        # Garde la peau du front sous la frange
+                        set_pixel(p_rgb, p_alpha, x, y, skin_color, 255)
+                    elif 372 <= x <= 524 and 130 <= y <= 315:
+                        # Garde un fond capillaire discret sur les côtés
+                        set_pixel(p_rgb, p_alpha, x, y, hair_bg_color, p_alpha[i])
+                    else:
+                        # Retire les mèches externes (elles seront dessinées par le calque meches_cheveux animé)
+                        p_alpha[i] = 0
+                        o = i * 3
+                        p_rgb[o] = 0
+                        p_rgb[o + 1] = 0
+                        p_rgb[o + 2] = 0
+        save_rgba_png(p_rgb, p_alpha, LAYERS_DIR / f"pose_{emo_key}_body.png")
 
     # 5. Sauvegarde des calques individuels en PNG
     ordered_layers: list[tuple[str, tuple[bytearray, bytearray] | Path]] = [

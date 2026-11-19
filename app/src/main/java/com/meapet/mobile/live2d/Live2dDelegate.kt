@@ -25,9 +25,12 @@ class Live2dDelegate private constructor() {
         private const val VOICE_DIR_LOWER_L  = "voice/lower_left"
         private const val VOICE_DIR_LOWER_R  = "voice/lower_right"
 
-        /** 从文件名提取显示文本："jp_哼。.ogg" → "哼。" */
-        fun textFromFilename(name: String): String =
-            name.substringAfter("_").substringBeforeLast(".")
+        /** 从文件名提取显示文本："jp_哼。.ogg" → translated phrase in active UI language */
+        fun textFromFilename(name: String, context: Context? = null, isAlita: Boolean = false): String {
+            val rawKey = TouchReactionHelper.extractVoiceKey(name)
+            val lang = TouchReactionHelper.resolveLanguageCode(context)
+            return TouchReactionHelper.translateVoiceText(rawKey, lang, isAlita)
+        }
 
         @Volatile
         private var instance: Live2dDelegate? = null
@@ -252,6 +255,7 @@ class Live2dDelegate private constructor() {
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var touchDownTime = 0L
+    private val touchReactionTracker = TouchReactionTracker()
 
     /** 已创建的 VoicePlayer 缓存，按子目录 key 存储，复用同一个播放器。
      *  用 ConcurrentHashMap：ensureVoicePlayer 在 GL 线程（触摸事件），
@@ -286,19 +290,21 @@ class Live2dDelegate private constructor() {
 
     /**
      * 检测触摸分区。
-     * @return (显示文本, 子目录名, 文件名)，不在模型区域内则 null
+     * @return TouchReaction + 目录名，不在模型区域内则 null
      */
-    private fun detectZone(x: Float, y: Float): Triple<String, String, String>? {
+    private fun detectZone(x: Float, y: Float): Pair<TouchReactionHelper.TapReaction, String>? {
         if (windowWidth <= 0 || windowHeight <= 0) return null
         val nx = (x / windowWidth) * 2f - 1f
         val ny = -((y / windowHeight) * 2f - 1f)
 
-        // 模型实际占屏区域
-        if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
+        val isAlita = Live2dManager.getInstance().activeSpec.renderType == AvatarRenderType.SPRITE_2D
+        if (isAlita) {
+            if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
+        } else {
+            if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
+        }
 
-        // 从上往下 6/10 分割线
-        val splitY = 0.00f
-
+        val splitY = if (isAlita) 0.18f else 0.00f
         val dir = if (ny > splitY) {
             VOICE_DIR_UPPER
         } else if (nx < 0f) {
@@ -311,8 +317,17 @@ class Live2dDelegate private constructor() {
         val files = vp.listVoices()
         if (files.isEmpty()) return null
 
-        val file = files[secureRandom.nextInt(files.size)]
-        return Triple(textFromFilename(file), dir, file)
+        val ctx = _appContext ?: _activity
+        val langCode = TouchReactionHelper.resolveLanguageCode(ctx)
+        val reaction = touchReactionTracker.onTap(
+            availableFiles = files,
+            nowMs = System.currentTimeMillis(),
+            langCode = langCode,
+            isAlita = isAlita,
+            picker = { bound -> secureRandom.nextInt(bound) }
+        ) ?: return null
+
+        return reaction to dir
     }
 
     fun onTouchEnd(x: Float, y: Float) {
@@ -324,14 +339,16 @@ class Live2dDelegate private constructor() {
         if (zoneTouchEnabled && isTap(x, y)) {
             val zone = detectZone(x, y)
             if (zone != null) {
-                val (text, dir, file) = zone
+                val (reaction, dir) = zone
                 // 互斥：TTS 正在朗读时先停掉，再播触摸语音
                 if (ttsPlayingChecker?.invoke() == true) ttsStopper?.invoke()
                 // 先停止所有正在播放的语音（包括其他分区的），再播放新语音
                 stopAllVoices()
-                ensureVoicePlayer(dir)?.play(file)
-                // 广播消息到 ChatViewModel
-                Live2dManager.emitTapMessage(text)
+                ensureVoicePlayer(dir)?.play(reaction.filename)
+                // Escalate avatar expression based on repeated taps
+                Live2dManager.getInstance().triggerTapEmotion(reaction.emotion)
+                // Broadcast translated message bubble to ChatViewModel
+                Live2dManager.emitTapMessage(reaction.text)
             }
         }
     }
