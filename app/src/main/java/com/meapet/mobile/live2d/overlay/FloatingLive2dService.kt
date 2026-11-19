@@ -248,7 +248,8 @@ class FloatingLive2dService : Service() {
     private fun createFloatingWindow() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
-        val winWidth = (150 * density).toInt()
+        val isSpriteAvatar = Live2dManager.getInstance().activeSpec.renderType == com.meapet.mobile.live2d.AvatarRenderType.SPRITE_2D
+        val winWidth = ((if (isSpriteAvatar) 124 else 150) * density).toInt()
         val winHeight = (218 * density).toInt()
 
         renderer = Live2dOverlayRenderer(

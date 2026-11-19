@@ -192,4 +192,13 @@ class LocalWebhookServerTest {
         assertTrue(urls.isNotEmpty())
         assertEquals("http://127.0.0.1:8081", urls.first())
     }
+
+    @Test
+    fun `POST notify infers calm praying expression on Bible verse and surprise on alarm when tag omitted`() {
+        val (s1, _) = postJson("/notify", """{"text":"Verset du matin : Psaume 23:1"}""")
+        val (s2, _) = postJson("/notify", """{"text":"⏰ DEBOUT ! C'est l'heure du réveil !"}""")
+        assertEquals(200, s1)
+        assertEquals(200, s2)
+        assertEquals(listOf("calme", "surprise"), triggeredEmotions)
+    }
 }

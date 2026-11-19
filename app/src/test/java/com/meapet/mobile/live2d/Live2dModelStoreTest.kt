@@ -114,10 +114,17 @@ class Live2dModelStoreTest {
     fun `sprite renderer maps all emotion aliases to supported 2d sprite keys`() {
         assertEquals("joie", SpriteAvatarRenderer.resolveSupportedEmotion("joie"))
         assertEquals("joie", SpriteAvatarRenderer.resolveSupportedEmotion("happy"))
+        assertEquals("joie", SpriteAvatarRenderer.resolveSupportedEmotion("coucou"))
         assertEquals("serieux", SpriteAvatarRenderer.resolveSupportedEmotion("Sérieux"))
         assertEquals("calme", SpriteAvatarRenderer.resolveSupportedEmotion("peaceful"))
+        assertEquals("calme", SpriteAvatarRenderer.resolveSupportedEmotion("prière"))
         assertEquals("colere", SpriteAvatarRenderer.resolveSupportedEmotion("colère"))
         assertEquals("fatigue", SpriteAvatarRenderer.resolveSupportedEmotion("yawn"))
+        assertEquals("malice", SpriteAvatarRenderer.resolveSupportedEmotion("malice"))
+        assertEquals("etirement", SpriteAvatarRenderer.resolveSupportedEmotion("étirement"))
+        assertEquals("surprise", SpriteAvatarRenderer.resolveSupportedEmotion("alerte"))
+        assertEquals("curiosite", SpriteAvatarRenderer.resolveSupportedEmotion("curiosité"))
+        assertEquals("clin_doeil", SpriteAvatarRenderer.resolveSupportedEmotion("wink"))
         assertEquals("normal", SpriteAvatarRenderer.resolveSupportedEmotion("normal"))
         assertEquals("normal", SpriteAvatarRenderer.resolveSupportedEmotion("unknown_mood"))
     }

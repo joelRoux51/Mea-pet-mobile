@@ -166,33 +166,58 @@ class SpriteAvatarRenderer {
         val prevSmoothX = smoothDragX
         smoothDragX += (targetDragX - smoothDragX) * dragLerp
         smoothDragY += (targetDragY - smoothDragY) * dragLerp
+        val isDragging = kotlin.math.abs(smoothDragX) > 0.03f || kotlin.math.abs(smoothDragY) > 0.03f
+
+        // Idle expressive gesture scheduler (calm stillness most of the time, never prays in idle)
+        val idleCycle = if (currentEmotion == Live2dEmotion.EMOTION_NORMAL && !isDragging) {
+            computeIdleGesture(now)
+        } else {
+            IdleCycleState(IdleGesture.NONE, 0f, 0f)
+        }
 
         val headImpulse = (smoothDragX - prevSmoothX) / dt
-        val windX = sin(t * 2.15f) * 0.014f + sin(t * 3.45f + 1.1f) * 0.006f
+        val hairMotionScale = if (currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.NONE) 0.42f else 1.0f
+        val windX = (sin(t * 2.0f) * 0.012f + sin(t * 3.3f + 1.1f) * 0.005f) * hairMotionScale
         val springForce = (windX - hairLagX) * 28f - headImpulse * 0.020f
         hairVelX = (hairVelX + springForce * dt) * kotlin.math.exp((-dt * 5.5f).toDouble()).toFloat()
         hairLagX = (hairLagX + hairVelX * dt).coerceIn(-0.045f, 0.045f)
 
         // Emotion-dependent breathing, bounce & anger shake
         val isAngry = currentEmotion == Live2dEmotion.EMOTION_COLERE
-        val isHappy = currentEmotion == Live2dEmotion.EMOTION_JOIE
+        val isHappy = currentEmotion == Live2dEmotion.EMOTION_JOIE ||
+            idleCycle.gesture == IdleGesture.COUCOU
         val isCalmOrTired = currentEmotion == Live2dEmotion.EMOTION_CALME ||
-            currentEmotion == Live2dEmotion.EMOTION_FATIGUE
+            currentEmotion == Live2dEmotion.EMOTION_FATIGUE ||
+            idleCycle.gesture == IdleGesture.BAILLEMENT
+        val isStretch = currentEmotion == Live2dEmotion.EMOTION_ETIREMENT ||
+            idleCycle.gesture == IdleGesture.ETIREMENT
 
         val breathSpeed = when {
             isAngry -> 2.65f
-            isHappy -> 2.20f
-            isCalmOrTired -> 1.35f
-            else -> 1.85f
+            isHappy -> 2.15f
+            isCalmOrTired -> 1.30f
+            else -> 1.55f
         }
         val breathSin = sin(t * breathSpeed)
-        val breathScaleY = 1.0f + 0.007f * breathSin
-        val breathOffsetY = 0.007f * breathSin
+        val breathAmp = if (currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.NONE) {
+            0.0036f
+        } else {
+            0.0065f
+        }
+        val stretchLift = when {
+            currentEmotion == Live2dEmotion.EMOTION_ETIREMENT -> 0.022f
+            idleCycle.gesture == IdleGesture.ETIREMENT -> 0.024f * idleCycle.weight
+            idleCycle.gesture == IdleGesture.BAILLEMENT -> 0.015f * idleCycle.weight
+            else -> 0f
+        }
+        val breathScaleY = 1.0f + breathAmp * breathSin + stretchLift
+        val breathOffsetY = breathAmp * breathSin + stretchLift * 0.45f
 
         val bounceElapsed = if (bounceStartMs > 0L) now - bounceStartMs else -1L
+        val bounceAmp = if (currentEmotion == Live2dEmotion.EMOTION_SURPRISE) 0.050f else 0.032f
         val bounceOffsetY = if (bounceElapsed in 0..EMOTION_BOUNCE_MS) {
             val p = bounceElapsed.toFloat() / EMOTION_BOUNCE_MS.toFloat()
-            sin(p * PI.toFloat()) * (1f - p) * 0.032f
+            sin(p * PI.toFloat()) * (1f - p) * bounceAmp
         } else {
             0f
         }
@@ -203,11 +228,11 @@ class SpriteAvatarRenderer {
             0f
         }
 
-        // Camera & perspective fitting so character matches original framing cleanly
+        // Camera & snug perspective fitting (tight against right border in overlay mode)
         val texAspect = baseTex.width.toFloat() / baseTex.height.toFloat().coerceAtLeast(1f)
         val screenAspect = viewWidth.toFloat() / viewHeight.toFloat().coerceAtLeast(1f)
-        val fillH = if (isOverlay) 0.94f else 0.78f
-        val fillW = if (isOverlay) 0.94f else 0.92f
+        val fillH = if (isOverlay) 1.02f else 0.80f
+        val fillW = if (isOverlay) 0.99f else 0.96f
         val tanHalfFov = tan(Math.toRadians(FOV_DEG * 0.5)).toFloat()
         val visHalfH = max(1.0f / fillH, texAspect / (fillW * screenAspect))
         val camDist = visHalfH / tanHalfFov
@@ -221,12 +246,46 @@ class SpriteAvatarRenderer {
         )
         Matrix.multiplyMM(vpMatrix, 0, projMatrix, 0, viewMatrix, 0)
 
-        // Base 3D pose orientation: gentle figure-8 idle + touch/drag 3D look
-        val bodyYaw = sin(t * 0.88f) * 4.8f + smoothDragX * 14.5f
-        val bodyPitch = sin(t * 0.58f + 0.7f) * 2.2f - smoothDragY * 8.5f
-        val bodyRoll = sin(t * 0.46f) * 1.1f + smoothDragX * 2.0f
+        // Calm stillness by default: zero idle wobble unless dragging or performing an expressive gesture
+        val activeWeight = when {
+            currentEmotion == Live2dEmotion.EMOTION_CURIOSITE -> 1f
+            currentEmotion == Live2dEmotion.EMOTION_MALICE -> 1f
+            currentEmotion == Live2dEmotion.EMOTION_ETIREMENT -> 1f
+            currentEmotion == Live2dEmotion.EMOTION_CLIN_DOEIL -> 1f
+            currentEmotion == Live2dEmotion.EMOTION_SURPRISE -> 1f
+            currentEmotion != Live2dEmotion.EMOTION_NORMAL -> 1f
+            else -> idleCycle.weight
+        }
+        val bodyYaw = when {
+            currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.NONE ->
+                smoothDragX * 14.5f
+            currentEmotion == Live2dEmotion.EMOTION_CURIOSITE ->
+                2.5f + smoothDragX * 13.0f
+            else ->
+                sin(t * 0.85f) * 2.6f * activeWeight + smoothDragX * 14.5f
+        }
+        val bodyPitch = when {
+            currentEmotion == Live2dEmotion.EMOTION_CURIOSITE ->
+                -2.8f - smoothDragY * 8.0f
+            isStretch ->
+                2.4f * activeWeight - smoothDragY * 8.0f
+            currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.NONE ->
+                -smoothDragY * 8.5f
+            else ->
+                sin(t * 0.58f + 0.7f) * 1.4f * activeWeight - smoothDragY * 8.5f
+        }
+        val bodyRoll = when {
+            idleCycle.gesture == IdleGesture.COUCOU ->
+                sin(idleCycle.progress * PI.toFloat() * 3f) * 2.4f * idleCycle.weight + smoothDragX * 2.0f
+            currentEmotion == Live2dEmotion.EMOTION_NORMAL ->
+                smoothDragX * 2.0f
+            else ->
+                sin(t * 0.46f) * 0.9f + smoothDragX * 2.0f
+        }
+
+        val screenShiftX = if (isOverlay) 0.018f * visHalfH else 0f
         val screenShiftY = (if (isOverlay) 0.0f else -0.04f) * visHalfH
-        val baseShiftX = smoothDragX * 0.045f + angerShakeX
+        val baseShiftX = screenShiftX + smoothDragX * 0.040f + angerShakeX
         val baseShiftY = screenShiftY + breathOffsetY + bounceOffsetY - smoothDragY * 0.035f
 
         Matrix.setIdentityM(modelMatrix, 0)
@@ -249,15 +308,15 @@ class SpriteAvatarRenderer {
         val hasFullRig = hasFullNormalRig()
         val hairTex = layerTextures[LAYER_HAIR]
 
-        // Cross-fade smoothly if switching emotion
+        // Cross-fade smoothly only when switching to/from a full-body pose texture
         val elapsedTrans = if (transitionStartMs > 0L) now - transitionStartMs else -1L
+        val usesBodySwapTransition = !(previousEmotion in RIG_EMOTIONS && currentEmotion in RIG_EMOTIONS)
         val prevTex = textures[previousEmotion]
-        if (prevTex != null && previousEmotion != currentEmotion && elapsedTrans in 0 until TRANSITION_MS) {
+        if (usesBodySwapTransition && prevTex != null && previousEmotion != currentEmotion && elapsedTrans in 0 until TRANSITION_MS) {
             val progress = (elapsedTrans.toFloat() / TRANSITION_MS.toFloat()).coerceIn(0f, 1f)
             val prevBody = resolveBodyTexture(previousEmotion) ?: prevTex
             val nextBody = resolveBodyTexture(currentEmotion) ?: baseTex
 
-            // Soft drop shadow behind cross-fade
             drawDropShadow3d(shader3d, nextBody, texAspect, clampedAlpha * (if (isOverlay) 0.16f else 0.28f))
 
             if (prevBody.id == nextBody.id) {
@@ -273,7 +332,7 @@ class SpriteAvatarRenderer {
                 }
             }
             if (hairTex != null) {
-                drawAnimatedHair3d(shader3d, hairTex, modelMatrix, texAspect, t, clampedAlpha)
+                drawAnimatedHair3d(shader3d, hairTex, modelMatrix, texAspect, t, hairMotionScale, clampedAlpha)
             }
             GLES20.glDisableVertexAttribArray(shader3d.positionLoc)
             GLES20.glDisableVertexAttribArray(shader3d.texCoordLoc)
@@ -282,23 +341,38 @@ class SpriteAvatarRenderer {
             return
         }
 
-        if (currentEmotion == Live2dEmotion.EMOTION_NORMAL && hasFullRig) {
-            drawLayeredNormalRig(
+        val activePoseEmotion = when {
+            currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.COUCOU && idleCycle.weight > 0.12f ->
+                Live2dEmotion.EMOTION_JOIE
+            currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture == IdleGesture.BAILLEMENT && idleCycle.weight > 0.12f ->
+                Live2dEmotion.EMOTION_FATIGUE
+            else -> currentEmotion
+        }
+
+        if (activePoseEmotion in RIG_EMOTIONS && hasFullRig) {
+            val poseState = buildRigPoseState(
+                emotion = activePoseEmotion,
+                idleCycle = idleCycle,
+                breathSin = breathSin,
+                blinkWeight = blinkWeight
+            )
+            drawLayeredRigPose(
                 shader = shader3d,
+                pose = poseState,
                 texAspect = texAspect,
                 t = t,
-                breathSin = breathSin,
-                blinkWeight = blinkWeight,
+                hairMotionScale = hairMotionScale,
                 alpha = clampedAlpha,
                 isOverlay = isOverlay
             )
         } else {
             drawLayeredEmotionPose(
                 shader = shader3d,
-                emotion = currentEmotion,
-                fallbackTex = baseTex,
+                emotion = activePoseEmotion,
+                fallbackTex = textures[activePoseEmotion] ?: baseTex,
                 texAspect = texAspect,
                 t = t,
+                hairMotionScale = hairMotionScale,
                 blinkWeight = blinkWeight,
                 alpha = clampedAlpha,
                 isOverlay = isOverlay
@@ -311,12 +385,113 @@ class SpriteAvatarRenderer {
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
     }
 
-    private fun drawLayeredNormalRig(
+    private fun buildRigPoseState(
+        emotion: String,
+        idleCycle: IdleCycleState,
+        breathSin: Float,
+        blinkWeight: Float
+    ): RigPoseState {
+        // Explicit rig expressions vs calm stillness + periodic idle rig gestures (etirement, malice)
+        return when {
+            emotion == Live2dEmotion.EMOTION_ETIREMENT || idleCycle.gesture == IdleGesture.ETIREMENT -> {
+                val w = if (emotion == Live2dEmotion.EMOTION_ETIREMENT) 1f else idleCycle.weight
+                RigPoseState(
+                    armLeftRollDeg = -26.0f * w - breathSin * 1.4f,
+                    armRightRollDeg = 26.0f * w + breathSin * 1.4f,
+                    headPitchDeg = 6.5f * w - smoothDragY * 4.5f,
+                    headYawDeg = smoothDragX * 6.5f,
+                    headRollDeg = smoothDragX * 2.1f,
+                    leftLidWeight = kotlin.math.max(blinkWeight, w),
+                    rightLidWeight = kotlin.math.max(blinkWeight, w),
+                    mouthLayerKey = if (w >= 0.15f) LAYER_MOUTH_JOIE else LAYER_MOUTH,
+                    browLiftY = 0.0025f * w + breathSin * 0.001f
+                )
+            }
+            emotion == Live2dEmotion.EMOTION_MALICE || idleCycle.gesture == IdleGesture.MALICE -> {
+                val w = if (emotion == Live2dEmotion.EMOTION_MALICE) 1f else idleCycle.weight
+                RigPoseState(
+                    armLeftRollDeg = 2.0f * w,
+                    armRightRollDeg = -4.5f * w,
+                    headYawDeg = -5.5f * w + smoothDragX * 6.5f,
+                    headPitchDeg = 1.5f * w - smoothDragY * 4.5f,
+                    headRollDeg = 8.5f * w + smoothDragX * 2.1f,
+                    pupilShiftX = -0.0050f * w,
+                    pupilShiftY = -0.0010f * w,
+                    leftLidWeight = kotlin.math.max(blinkWeight, w),
+                    rightLidWeight = blinkWeight,
+                    leftBrowOffsetY = -0.0022f * w,
+                    rightBrowOffsetY = 0.0042f * w,
+                    mouthLayerKey = if (w >= 0.15f) LAYER_MOUTH_MALICE else LAYER_MOUTH
+                )
+            }
+            emotion == Live2dEmotion.EMOTION_SURPRISE -> {
+                RigPoseState(
+                    armLeftRollDeg = -14.0f,
+                    armRightRollDeg = 14.0f,
+                    headPitchDeg = 3.2f - smoothDragY * 4.5f,
+                    headYawDeg = smoothDragX * 6.5f,
+                    headRollDeg = smoothDragX * 2.1f,
+                    pupilScale = 0.82f,
+                    leftLidWeight = 0f,
+                    rightLidWeight = 0f,
+                    leftBrowOffsetY = 0.0105f,
+                    rightBrowOffsetY = 0.0105f,
+                    mouthLayerKey = LAYER_MOUTH_SURPRISE
+                )
+            }
+            emotion == Live2dEmotion.EMOTION_CURIOSITE -> {
+                RigPoseState(
+                    armLeftRollDeg = -4.0f,
+                    armRightRollDeg = 4.0f,
+                    headYawDeg = 7.5f + smoothDragX * 6.0f,
+                    headPitchDeg = 2.0f - smoothDragY * 4.5f,
+                    headRollDeg = -10.5f + smoothDragX * 2.0f,
+                    pupilShiftX = 0.0032f,
+                    pupilShiftY = 0.0022f,
+                    leftLidWeight = blinkWeight,
+                    rightLidWeight = blinkWeight,
+                    leftBrowOffsetY = -0.0012f,
+                    rightBrowOffsetY = 0.0068f,
+                    mouthLayerKey = LAYER_MOUTH
+                )
+            }
+            emotion == Live2dEmotion.EMOTION_CLIN_DOEIL -> {
+                RigPoseState(
+                    armLeftRollDeg = 1.5f,
+                    armRightRollDeg = -6.0f,
+                    headYawDeg = -3.5f + smoothDragX * 6.5f,
+                    headPitchDeg = -1.0f - smoothDragY * 4.5f,
+                    headRollDeg = 5.8f + smoothDragX * 2.1f,
+                    leftLidWeight = 1f,
+                    rightLidWeight = blinkWeight,
+                    leftBrowOffsetY = -0.0015f,
+                    rightBrowOffsetY = 0.0032f,
+                    mouthLayerKey = LAYER_MOUTH_JOIE
+                )
+            }
+            else -> {
+                // Calm STILL state: only subtle breathing + look on drag
+                RigPoseState(
+                    armLeftRollDeg = breathSin * 0.7f + smoothDragX * 1.2f,
+                    armRightRollDeg = -breathSin * 0.7f - smoothDragX * 1.2f,
+                    headYawDeg = smoothDragX * 6.5f,
+                    headPitchDeg = -smoothDragY * 4.5f,
+                    headRollDeg = smoothDragX * 2.1f,
+                    leftLidWeight = blinkWeight,
+                    rightLidWeight = blinkWeight,
+                    browLiftY = breathSin * 0.0010f,
+                    mouthLayerKey = LAYER_MOUTH
+                )
+            }
+        }
+    }
+
+    private fun drawLayeredRigPose(
         shader: Sprite3dShader,
+        pose: RigPoseState,
         texAspect: Float,
         t: Float,
-        breathSin: Float,
-        blinkWeight: Float,
+        hairMotionScale: Float,
         alpha: Float,
         isOverlay: Boolean
     ) {
@@ -332,25 +507,24 @@ class SpriteAvatarRenderer {
         val rightLid = layerTextures[LAYER_RIGHT_EYELID]
         val leftBrow = layerTextures[LAYER_LEFT_BROW]
         val rightBrow = layerTextures[LAYER_RIGHT_BROW]
-        val mouth = layerTextures[LAYER_MOUTH]
+        val mouth = layerTextures[pose.mouthLayerKey] ?: layerTextures[LAYER_MOUTH]
         val hair = layerTextures[LAYER_HAIR]
 
         // 1. Soft 3D depth drop shadow
         drawDropShadow3d(shader, torso, texAspect, alpha * (if (isOverlay) 0.16f else 0.30f))
 
-        // 2. Torso base (curved chest/waist armor)
+        // 2. Torso base (with shoulder socket underfill for safe arm raises/stretches)
         drawMeshPart(shader, torso, modelMatrix, texAspect, 0f, 0.078f, alpha, 0.25f)
 
-        // 3. Independent articulated arms around shoulder pivots
-        val armSwingDeg = breathSin * 1.15f + smoothDragX * 1.4f
+        // 3. Articulated arms around shoulder pivots calibrated to 760x1200 rig
         if (leftArm != null) {
             buildPivotedMatrix(
                 base = modelMatrix,
                 out = partMatrix,
-                pivotX = -0.22f,
-                pivotY = 0.36f,
+                pivotX = -ARM_PIVOT_X,
+                pivotY = ARM_PIVOT_Y,
                 zOffset = 0.024f,
-                rollDeg = armSwingDeg
+                rollDeg = pose.armLeftRollDeg
             )
             drawMeshPart(shader, leftArm, partMatrix, texAspect, 0f, 0.068f, alpha, 0.28f)
         }
@@ -358,62 +532,73 @@ class SpriteAvatarRenderer {
             buildPivotedMatrix(
                 base = modelMatrix,
                 out = partMatrix,
-                pivotX = 0.22f,
-                pivotY = 0.36f,
+                pivotX = ARM_PIVOT_X,
+                pivotY = ARM_PIVOT_Y,
                 zOffset = 0.024f,
-                rollDeg = -armSwingDeg
+                rollDeg = pose.armRightRollDeg
             )
             drawMeshPart(shader, rightArm, partMatrix, texAspect, 0f, 0.068f, alpha, 0.28f)
         }
 
-        // 4. Independent head tilt around neck pivot (extra 3D depth vs shoulders!)
+        // 4. Independent head orientation around neck pivot
         val headMatrix = FloatArray(16)
-        val headYaw = smoothDragX * 6.5f + sin(t * 1.12f + 0.4f) * 2.2f
-        val headPitch = -smoothDragY * 4.5f + sin(t * 0.84f) * 1.5f
-        val headRoll = smoothDragX * 2.1f + sin(t * 0.72f) * 1.7f
-        buildHeadMatrix(modelMatrix, headMatrix, zOffset = 0.056f, yawDeg = headYaw, pitchDeg = headPitch, rollDeg = headRoll)
+        buildHeadMatrix(
+            base = modelMatrix,
+            out = headMatrix,
+            zOffset = 0.056f,
+            yawDeg = pose.headYawDeg,
+            pitchDeg = pose.headPitchDeg,
+            rollDeg = pose.headRollDeg
+        )
 
-        if (head != null) {
-            drawMeshPart(shader, head, headMatrix, texAspect, 0f, 0.082f, alpha, 0.28f)
-        }
+        head?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0f, 0.082f, alpha, 0.28f) }
 
         // 5. Eyes & sclera
         leftEye?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.016f, 0.082f, alpha, 0.12f) }
         rightEye?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.016f, 0.082f, alpha, 0.12f) }
 
-        // 6. Tracked cyan pupils inside eye sockets
-        val eyeLookX = (smoothDragX * 0.0105f + sin(t * 0.45f) * 0.0018f).coerceIn(-0.011f, 0.011f)
-        val eyeLookY = (smoothDragY * 0.0065f + cos(t * 0.38f) * 0.0012f).coerceIn(-0.007f, 0.007f)
-        if (blinkWeight < 0.85f) {
+        // 6. Tracked natural brown pupils inside eye sockets (optional constricted scale for surprise)
+        val eyeLookX = (smoothDragX * 0.010f + pose.pupilShiftX).coerceIn(-0.011f, 0.011f)
+        val eyeLookY = (smoothDragY * 0.006f + pose.pupilShiftY).coerceIn(-0.007f, 0.007f)
+        if (pose.leftLidWeight < 0.85f) {
             leftPupil?.let {
-                Matrix.translateM(partMatrix, 0, headMatrix, 0, eyeLookX, eyeLookY, 0.022f)
+                buildPupilMatrix(headMatrix, partMatrix, -EYE_PIVOT_X, EYE_PIVOT_Y, eyeLookX, eyeLookY, pose.pupilScale)
                 drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.16f)
             }
+        }
+        if (pose.rightLidWeight < 0.85f) {
             rightPupil?.let {
-                Matrix.translateM(partMatrix, 0, headMatrix, 0, eyeLookX, eyeLookY, 0.022f)
+                buildPupilMatrix(headMatrix, partMatrix, EYE_PIVOT_X, EYE_PIVOT_Y, eyeLookX, eyeLookY, pose.pupilScale)
                 drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.16f)
             }
         }
 
-        // 7. True blinking eyelids (paupiere_gauche / paupiere_droite)
-        if (blinkWeight > 0.05f) {
-            val lidAlpha = alpha * blinkWeight
-            leftLid?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.028f, 0.082f, lidAlpha, 0.14f) }
-            rightLid?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.028f, 0.082f, lidAlpha, 0.14f) }
+        // 7. True blinking & wink eyelids (paupiere_gauche / paupiere_droite)
+        if (pose.leftLidWeight > 0.05f) {
+            leftLid?.let {
+                drawMeshPart(shader, it, headMatrix, texAspect, 0.028f, 0.082f, alpha * pose.leftLidWeight.coerceIn(0f, 1f), 0.14f)
+            }
+        }
+        if (pose.rightLidWeight > 0.05f) {
+            rightLid?.let {
+                drawMeshPart(shader, it, headMatrix, texAspect, 0.028f, 0.082f, alpha * pose.rightLidWeight.coerceIn(0f, 1f), 0.14f)
+            }
         }
 
-        // 8. Eyebrows & mouth
-        val browLift = breathSin * 0.0018f
-        if (leftBrow != null || rightBrow != null) {
-            Matrix.translateM(partMatrix, 0, headMatrix, 0, 0f, browLift, 0.032f)
-            leftBrow?.let { drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f) }
-            rightBrow?.let { drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f) }
+        // 8. Articulated eyebrows & expressive mouth (normal / joie / colere / malice / surprise)
+        leftBrow?.let {
+            Matrix.translateM(partMatrix, 0, headMatrix, 0, 0f, pose.browLiftY + pose.leftBrowOffsetY, 0.032f)
+            drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f)
+        }
+        rightBrow?.let {
+            Matrix.translateM(partMatrix, 0, headMatrix, 0, 0f, pose.browLiftY + pose.rightBrowOffsetY, 0.032f)
+            drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f)
         }
         mouth?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.026f, 0.082f, alpha, 0.14f) }
 
         // 9. Animated 3D floating hair strands (meches_cheveux)
         if (hair != null) {
-            drawAnimatedHair3d(shader, hair, headMatrix, texAspect, t, alpha)
+            drawAnimatedHair3d(shader, hair, headMatrix, texAspect, t, hairMotionScale, alpha)
         }
     }
 
@@ -423,6 +608,7 @@ class SpriteAvatarRenderer {
         fallbackTex: Live2dTextureManager.TextureInfo,
         texAspect: Float,
         t: Float,
+        hairMotionScale: Float,
         blinkWeight: Float,
         alpha: Float,
         isOverlay: Boolean
@@ -434,10 +620,8 @@ class SpriteAvatarRenderer {
         drawDropShadow3d(shader, bodyTex ?: fallbackTex, texAspect, alpha * (if (isOverlay) 0.16f else 0.30f))
 
         if (bodyTex != null && hair != null) {
-            // Draw hairless body in 3D curved relief
             drawMeshPart(shader, bodyTex, modelMatrix, texAspect, 0f, 0.082f, alpha, 0.26f)
 
-            // Blink cleanly with real eyelids on open-eye emotions (never swap calme praying pose!)
             if (emotion in BLINK_ELIGIBLE_EMOTIONS && blinkWeight > 0.05f) {
                 val lidAlpha = alpha * blinkWeight
                 layerTextures[LAYER_LEFT_EYELID]?.let {
@@ -448,8 +632,7 @@ class SpriteAvatarRenderer {
                 }
             }
 
-            // Draw swaying hair in 3D foreground layer over the body
-            drawAnimatedHair3d(shader, hair, modelMatrix, texAspect, t, alpha)
+            drawAnimatedHair3d(shader, hair, modelMatrix, texAspect, t, hairMotionScale, alpha)
         } else {
             drawMeshPart(shader, fallbackTex, modelMatrix, texAspect, 0f, 0.082f, alpha, 0.26f)
         }
@@ -482,6 +665,7 @@ class SpriteAvatarRenderer {
         parentMatrix: FloatArray,
         texAspect: Float,
         t: Float,
+        motionScale: Float,
         alpha: Float
     ) {
         // Hair layer sits slightly forward (+Z) and sways progressively from crown down to tips
@@ -492,7 +676,8 @@ class SpriteAvatarRenderer {
             zOffset = 0f,
             reliefDepth = 0.105f,
             isHair = true,
-            timeSec = t
+            timeSec = t,
+            hairMotionScale = motionScale
         )
         submitDraw(
             shader = shader,
@@ -544,7 +729,8 @@ class SpriteAvatarRenderer {
         zOffset: Float,
         reliefDepth: Float,
         isHair: Boolean,
-        timeSec: Float
+        timeSec: Float,
+        hairMotionScale: Float = 1.0f
     ) {
         val halfH = 1.0f
         val halfW = texAspect
@@ -572,7 +758,7 @@ class SpriteAvatarRenderer {
                 var z = zOffset + reliefDepth * horizCurve * vertCurve
 
                 if (isHair && hairWeight > 0f) {
-                    val sideFlare = 1.0f + 0.55f * (kotlin.math.abs(dxNorm) * 1.4f).coerceIn(0f, 1f)
+                    val sideFlare = (1.0f + 0.55f * (kotlin.math.abs(dxNorm) * 1.4f).coerceIn(0f, 1f)) * hairMotionScale
                     val swayX = (sin(timeSec * 2.25f + u * 4.5f) * 0.019f +
                         sin(timeSec * 3.8f + v * 7.0f) * 0.006f +
                         hairLagX * 0.85f) * hairWeight * sideFlare
@@ -697,10 +883,38 @@ class SpriteAvatarRenderer {
         Matrix.translateM(out, 0, -pivotX, -pivotY, 0f)
     }
 
-    /**
-     * Smooth 165 ms eyelid blink envelope every 3.8 s (returns 0f = open, 1f = closed).
-     * Never swaps the full `calme.png` praying pose!
-     */
+    private fun buildPupilMatrix(
+        base: FloatArray,
+        out: FloatArray,
+        pivotX: Float,
+        pivotY: Float,
+        shiftX: Float,
+        shiftY: Float,
+        scale: Float
+    ) {
+        Matrix.translateM(out, 0, base, 0, shiftX + pivotX, shiftY + pivotY, 0.022f)
+        if (kotlin.math.abs(scale - 1f) > 0.001f) {
+            Matrix.scaleM(out, 0, scale, scale, 1f)
+        }
+        Matrix.translateM(out, 0, -pivotX, -pivotY, 0f)
+    }
+
+    private fun computeIdleGesture(nowMs: Long): IdleCycleState {
+        val cyclePos = nowMs % IDLE_CYCLE_MS
+        if (cyclePos < IDLE_STILL_MS) {
+            return IdleCycleState(IdleGesture.NONE, 0f, 0f)
+        }
+        val p = ((cyclePos - IDLE_STILL_MS).toFloat() / (IDLE_CYCLE_MS - IDLE_STILL_MS).toFloat()).coerceIn(0f, 1f)
+        val bell = sin(p * PI.toFloat()).coerceIn(0f, 1f).pow(0.65f)
+        val gesture = when (((nowMs / IDLE_CYCLE_MS) % 4L).toInt()) {
+            0 -> IdleGesture.COUCOU
+            1 -> IdleGesture.ETIREMENT
+            2 -> IdleGesture.MALICE
+            else -> IdleGesture.BAILLEMENT
+        }
+        return IdleCycleState(gesture = gesture, progress = p, weight = bell)
+    }
+
     private fun computeBlinkWeight(nowMs: Long): Float {
         val cyclePos = nowMs % BLINK_INTERVAL_MS
         if (cyclePos >= BLINK_DURATION_MS) return 0f
@@ -766,15 +980,52 @@ class SpriteAvatarRenderer {
         return created
     }
 
+    private enum class IdleGesture {
+        NONE,
+        COUCOU,
+        ETIREMENT,
+        MALICE,
+        BAILLEMENT
+    }
+
+    private data class IdleCycleState(
+        val gesture: IdleGesture,
+        val progress: Float,
+        val weight: Float
+    )
+
+    private data class RigPoseState(
+        val armLeftRollDeg: Float = 0f,
+        val armRightRollDeg: Float = 0f,
+        val headYawDeg: Float = 0f,
+        val headPitchDeg: Float = 0f,
+        val headRollDeg: Float = 0f,
+        val pupilShiftX: Float = 0f,
+        val pupilShiftY: Float = 0f,
+        val pupilScale: Float = 1f,
+        val leftLidWeight: Float = 0f,
+        val rightLidWeight: Float = 0f,
+        val browLiftY: Float = 0f,
+        val leftBrowOffsetY: Float = 0f,
+        val rightBrowOffsetY: Float = 0f,
+        val mouthLayerKey: String = LAYER_MOUTH
+    )
+
     companion object {
         private const val TAG = "SpriteAvatarRenderer"
         private const val TRANSITION_MS = 180L
         private const val EMOTION_BOUNCE_MS = 380L
-        private const val BLINK_INTERVAL_MS = 3800L
+        private const val BLINK_INTERVAL_MS = 4200L
         private const val BLINK_DURATION_MS = 165L
+        private const val IDLE_CYCLE_MS = 15_000L
+        private const val IDLE_STILL_MS = 10_600L
 
         private const val FOV_DEG = 34f
         private const val HEAD_PIVOT_Y = 0.442f
+        private const val ARM_PIVOT_X = 0.195f
+        private const val ARM_PIVOT_Y = 0.36f
+        private const val EYE_PIVOT_X = 0.0665f
+        private const val EYE_PIVOT_Y = 0.6275f
 
         private const val MESH_COLS = 16
         private const val MESH_ROWS = 20
@@ -794,6 +1045,10 @@ class SpriteAvatarRenderer {
         private const val LAYER_LEFT_BROW = "sourcil_gauche"
         private const val LAYER_RIGHT_BROW = "sourcil_droit"
         private const val LAYER_MOUTH = "bouche"
+        private const val LAYER_MOUTH_JOIE = "bouche_joie"
+        private const val LAYER_MOUTH_COLERE = "bouche_colere"
+        private const val LAYER_MOUTH_MALICE = "bouche_malice"
+        private const val LAYER_MOUTH_SURPRISE = "bouche_surprise"
         private const val LAYER_HAIR = "meches_cheveux"
 
         private val LAYER_NAMES = listOf(
@@ -810,6 +1065,10 @@ class SpriteAvatarRenderer {
             LAYER_LEFT_BROW,
             LAYER_RIGHT_BROW,
             LAYER_MOUTH,
+            LAYER_MOUTH_JOIE,
+            LAYER_MOUTH_COLERE,
+            LAYER_MOUTH_MALICE,
+            LAYER_MOUTH_SURPRISE,
             LAYER_HAIR,
             "pose_joie_body",
             "pose_serieux_body",
@@ -826,7 +1085,21 @@ class SpriteAvatarRenderer {
             Live2dEmotion.EMOTION_SERIEUX,
             Live2dEmotion.EMOTION_COLERE,
             Live2dEmotion.EMOTION_CALME,
-            Live2dEmotion.EMOTION_FATIGUE
+            Live2dEmotion.EMOTION_FATIGUE,
+            Live2dEmotion.EMOTION_MALICE,
+            Live2dEmotion.EMOTION_ETIREMENT,
+            Live2dEmotion.EMOTION_SURPRISE,
+            Live2dEmotion.EMOTION_CURIOSITE,
+            Live2dEmotion.EMOTION_CLIN_DOEIL
+        )
+
+        private val RIG_EMOTIONS = setOf(
+            Live2dEmotion.EMOTION_NORMAL,
+            Live2dEmotion.EMOTION_MALICE,
+            Live2dEmotion.EMOTION_ETIREMENT,
+            Live2dEmotion.EMOTION_SURPRISE,
+            Live2dEmotion.EMOTION_CURIOSITE,
+            Live2dEmotion.EMOTION_CLIN_DOEIL
         )
 
         private val BLINK_ELIGIBLE_EMOTIONS = setOf(

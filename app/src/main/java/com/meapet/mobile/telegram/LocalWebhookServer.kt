@@ -279,6 +279,7 @@ class LocalWebhookServer(
             val parsedEmotion = Live2dEmotion.extractFromText(rawText)
             val cleanText = parsedEmotion.cleanText
             val emotion = parsedEmotion.emotion
+                ?: cleanText.takeIf { it.isNotEmpty() }?.let { Live2dEmotion.inferEmotionFromContext("", it) }
 
             if (cleanText.isEmpty() && emotion == null) {
                 writeJsonResponse(output, 400, "Bad Request", """{"ok":false,"error":"Missing 'text' field"}""")

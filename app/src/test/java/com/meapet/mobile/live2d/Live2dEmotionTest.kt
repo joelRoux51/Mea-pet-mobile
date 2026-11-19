@@ -52,4 +52,51 @@ class Live2dEmotionTest {
         assertTrue(Live2dEmotion.isDefaultEmotion("normal"))
         assertFalse(Live2dEmotion.isDefaultEmotion("joie"))
     }
+
+    @Test
+    fun `normalizeEmotionName resolves Jarvis and expressive gesture aliases`() {
+        assertEquals("calme", Live2dEmotion.normalizeEmotionName("prière"))
+        assertEquals("calme", Live2dEmotion.normalizeEmotionName("verset"))
+        assertEquals("joie", Live2dEmotion.normalizeEmotionName("coucou"))
+        assertEquals("malice", Live2dEmotion.normalizeEmotionName("ironie"))
+        assertEquals("malice", Live2dEmotion.normalizeEmotionName("langue"))
+        assertEquals("etirement", Live2dEmotion.normalizeEmotionName("étirement"))
+        assertEquals("surprise", Live2dEmotion.normalizeEmotionName("alerte"))
+        assertEquals("surprise", Live2dEmotion.normalizeEmotionName("réveil"))
+        assertEquals("curiosite", Live2dEmotion.normalizeEmotionName("curiosité"))
+        assertEquals("curiosite", Live2dEmotion.normalizeEmotionName("photo"))
+        assertEquals("clin_doeil", Live2dEmotion.normalizeEmotionName("clin d'œil"))
+    }
+
+    @Test
+    fun `inferEmotionFromContext detects Bible verse prayer alarms photos and teasing`() {
+        assertEquals(
+            "calme",
+            Live2dEmotion.inferEmotionFromContext("Donne-moi un verset de la Bible s'il te plaît", "Voici Psaume 23:1")
+        )
+        assertEquals(
+            "calme",
+            Live2dEmotion.inferEmotionFromContext("Lis un passage", "Car Dieu a tant aimé le monde (Jean 3:16)")
+        )
+        assertEquals(
+            "surprise",
+            Live2dEmotion.inferEmotionFromContext("", "⏰ DEBOUT ! C'est l'heure du réveil !")
+        )
+        assertEquals(
+            "curiosite",
+            Live2dEmotion.inferEmotionFromContext("Que vois-tu sur cette photo ?", "Je regarde l'image")
+        )
+        assertEquals(
+            "malice",
+            Live2dEmotion.inferEmotionFromContext("Tu te moques ?", "Haha, juste une petite touche d'ironie !")
+        )
+        assertEquals(
+            "etirement",
+            Live2dEmotion.inferEmotionFromContext("Fais un étirement", "C'est parti pour une petite pause")
+        )
+        assertEquals(
+            "fatigue",
+            Live2dEmotion.inferEmotionFromContext("Bonne nuit Alita", "Repose-toi bien")
+        )
+    }
 }

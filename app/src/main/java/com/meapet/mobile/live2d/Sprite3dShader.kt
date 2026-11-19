@@ -144,8 +144,8 @@ class Sprite3dShader : AutoCloseable {
                 float shade = 0.86 + 0.19 * ndotl;
                 vec3 H = normalize(L + V);
                 float spec = pow(max(dot(N, H), 0.0), 20.0) * 0.085;
-                float fresnel = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.3) * uRimStrength;
-                vec3 rimTint = vec3(0.40, 0.88, 1.00) * fresnel;
+                float fresnel = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.5) * uRimStrength;
+                vec3 rimTint = vec3(0.74, 0.86, 0.96) * fresnel;
                 vec3 litRgb = tex.rgb * shade + (vec3(spec) + rimTint) * tex.a;
                 gl_FragColor = vec4(litRgb, tex.a) * uBaseColor;
             }

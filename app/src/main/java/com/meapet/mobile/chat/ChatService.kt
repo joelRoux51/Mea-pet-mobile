@@ -5,6 +5,8 @@ import com.meapet.mobile.client.OpenAiCompatibleClient
 import com.meapet.mobile.client.model.ApiRequest
 import com.meapet.mobile.client.model.ApiResponse
 import com.meapet.mobile.config.AppConfig
+import com.meapet.mobile.live2d.Live2dEmotion
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.memory.MemoryManager
 import com.meapet.mobile.memory.MemoryOpsProtocol
 import com.meapet.mobile.settings.SettingsManager
@@ -134,10 +136,16 @@ class ChatService(
                 }
                 // 6b) 剥离模型附在回复末尾的记忆协议块（对用户不可见，见 MemoryOpsProtocol）
                 val parsed = MemoryOpsProtocol.extract(assistantContent)
+                val emotionParsed = Live2dEmotion.extractFromText(parsed.visibleReply)
+                val resolvedEmotion = emotionParsed.emotion
+                    ?: Live2dEmotion.inferEmotionFromContext(content, emotionParsed.cleanText)
+                if (resolvedEmotion != null) {
+                    runCatching { Live2dManager.getInstance().triggerEmotion(resolvedEmotion) }
+                }
                 val memoryOps = parsed.ops
                 val assistantMessage = ChatMessage(
                     role = ChatRole.assistant,
-                    content = parsed.visibleReply,
+                    content = emotionParsed.cleanText.ifEmpty { parsed.visibleReply },
                     // 块留在消息上（不展示），下一轮贴回历史当格式范例，见 ConversationManager
                     memoryOpsBlock = parsed.rawBlock
                 )
