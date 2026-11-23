@@ -130,6 +130,8 @@
     <string name="live2d_builtin_name">Mea (Integrado)</string>
     <string name="live2d_alita_builtin_name">Alita 2D (Integrado)</string>
     <string name="live2d_sprite_2d_badge">Modo Avatar 2D (Sprites PNG)</string>
+    <string name="live2d_alita_face_builtin_name">Alita Rostro Live2D (Integrado)</string>
+    <string name="live2d_face_live2d_badge">Rostro 3D interactivo · 11 expresiones vinculadas</string>
     <string name="live2d_import_zip">Importar modelo (.zip)</string>
     <string name="live2d_importing">Importando modelo…</string>
     <string name="live2d_active_badge">Activo</string>

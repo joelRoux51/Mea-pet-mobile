@@ -44,6 +44,12 @@ class SpriteAvatarRenderer {
     private var bounceStartMs = 0L
     private var lastFrameMs = 0L
 
+    private var faceModelMode = false
+    private var faceExpressions: AlitaFaceExpressionSet? = null
+    private var faceTransitionMs = 240L
+    private var currentFaceExpr = AlitaFaceExpressionSet.DEFAULT_EXPRESSION
+    private var previousFaceExpr = AlitaFaceExpressionSet.DEFAULT_EXPRESSION
+
     // Spring-smoothed drag / hair secondary motion state (GL thread only)
     private var smoothDragX = 0f
     private var smoothDragY = 0f
@@ -78,6 +84,11 @@ class SpriteAvatarRenderer {
         fallbackSprite = null
         fallbackProgramId = 0
         loaded = false
+        faceModelMode = false
+        faceExpressions = null
+        faceTransitionMs = 240L
+        currentFaceExpr = AlitaFaceExpressionSet.DEFAULT_EXPRESSION
+        previousFaceExpr = AlitaFaceExpressionSet.DEFAULT_EXPRESSION
         transitionStartMs = 0L
         bounceStartMs = 0L
         lastFrameMs = 0L
@@ -87,11 +98,38 @@ class SpriteAvatarRenderer {
         hairVelX = 0f
     }
 
-    fun load(dirPath: String, textureManager: Live2dTextureManager): Boolean {
+    fun load(
+        dirPath: String,
+        textureManager: Live2dTextureManager,
+        isFaceModel: Boolean = false
+    ): Boolean {
         textures.clear()
         layerTextures.clear()
+        faceModelMode = isFaceModel
         val baseDir = dirPath.trimEnd('/')
 
+        if (isFaceModel) {
+            for (layerKey in FACE_LAYER_NAMES) {
+                val filePath = "$baseDir/layers/$layerKey.png"
+                loadOptionalTexture(textureManager, filePath)?.let { layerTextures[layerKey] = it }
+            }
+            faceExpressions = AlitaFaceExpressionSet.load(baseDir)
+            val resolvedExpr = faceExpressions?.resolve(currentEmotion) ?: AlitaFaceExpressionSet.DEFAULT_EXPRESSION
+            currentFaceExpr = resolvedExpr
+            previousFaceExpr = resolvedExpr
+            loaded = hasFullNormalRig()
+            if (!loaded) {
+                Log.e(TAG, "Missing required face Live2D layers in $baseDir")
+            } else {
+                Log.i(
+                    TAG,
+                    "Loaded ${layerTextures.size} face Live2D layers & ${faceExpressions?.expressions?.size ?: 0} linked expressions from $baseDir"
+                )
+            }
+            return loaded
+        }
+
+        faceExpressions = null
         for (emotionKey in SUPPORTED_EMOTIONS) {
             val filePath = "$baseDir/$emotionKey.png"
             loadOptionalTexture(textureManager, filePath)?.let { textures[emotionKey] = it }
@@ -126,8 +164,22 @@ class SpriteAvatarRenderer {
     }
 
     fun setEmotion(rawEmotion: String) {
-        val resolved = resolveSupportedEmotion(rawEmotion)
         val now = SystemClock.uptimeMillis()
+        if (faceModelMode) {
+            val resolvedExpr = faceExpressions?.resolve(rawEmotion) ?: AlitaFaceExpressionSet.DEFAULT_EXPRESSION
+            val resolved = resolveSupportedEmotion(resolvedExpr.name)
+            if (resolvedExpr.name != currentFaceExpr.name) {
+                previousFaceExpr = currentFaceExpr
+                currentFaceExpr = resolvedExpr
+                faceTransitionMs = resolvedExpr.fadeInMs
+                transitionStartMs = now
+            }
+            previousEmotion = currentEmotion
+            currentEmotion = resolved
+            bounceStartMs = now
+            return
+        }
+        val resolved = resolveSupportedEmotion(rawEmotion)
         if (resolved != currentEmotion) {
             previousEmotion = currentEmotion
             currentEmotion = resolved
@@ -148,7 +200,11 @@ class SpriteAvatarRenderer {
         isImmersive: Boolean = false
     ) {
         if (!loaded || viewWidth <= 0 || viewHeight <= 0) return
-        val baseTex = textures[currentEmotion] ?: textures[Live2dEmotion.EMOTION_NORMAL] ?: return
+        val baseTex = if (faceModelMode) {
+            layerTextures[LAYER_TORSO] ?: layerTextures[LAYER_HEAD] ?: return
+        } else {
+            textures[currentEmotion] ?: textures[Live2dEmotion.EMOTION_NORMAL] ?: return
+        }
 
         if (shader3d == null || !shader3d.isValid) {
             drawFlatFallback(viewWidth, viewHeight, shaderProgramId, baseTex, dragX, dragY, opacity, isOverlay, isImmersive)
@@ -229,10 +285,10 @@ class SpriteAvatarRenderer {
             0f
         }
 
-        // Camera & perspective fitting (normal vs full-height centered immersive vs overlay)
+        // Camera & perspective fitting (normal vs full-height centered immersive vs overlay vs face portrait)
         val texAspect = baseTex.width.toFloat() / baseTex.height.toFloat().coerceAtLeast(1f)
         val screenAspect = viewWidth.toFloat() / viewHeight.toFloat().coerceAtLeast(1f)
-        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive)
+        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive, isFaceModel = faceModelMode)
         val tanHalfFov = tan(Math.toRadians(FOV_DEG * 0.5)).toFloat()
         val visHalfH = computeVisibleHalfHeight(texAspect, screenAspect, framing)
         val camDist = visHalfH / tanHalfFov
@@ -307,6 +363,29 @@ class SpriteAvatarRenderer {
         val blinkWeight = computeBlinkWeight(now)
         val hasFullRig = hasFullNormalRig()
         val hairTex = layerTextures[LAYER_HAIR]
+
+        if (faceModelMode) {
+            val poseState = buildLinkedFaceRigPoseState(
+                nowMs = now,
+                idleCycle = idleCycle,
+                breathSin = breathSin,
+                blinkWeight = blinkWeight
+            )
+            drawLayeredRigPose(
+                shader = shader3d,
+                pose = poseState,
+                texAspect = texAspect,
+                t = t,
+                hairMotionScale = hairMotionScale,
+                alpha = clampedAlpha,
+                isOverlay = isOverlay
+            )
+            GLES20.glDisableVertexAttribArray(shader3d.positionLoc)
+            GLES20.glDisableVertexAttribArray(shader3d.texCoordLoc)
+            GLES20.glDisableVertexAttribArray(shader3d.normalLoc)
+            GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            return
+        }
 
         // Cross-fade smoothly only when switching to/from a full-body pose texture
         val elapsedTrans = if (transitionStartMs > 0L) now - transitionStartMs else -1L
@@ -383,6 +462,95 @@ class SpriteAvatarRenderer {
         GLES20.glDisableVertexAttribArray(shader3d.texCoordLoc)
         GLES20.glDisableVertexAttribArray(shader3d.normalLoc)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+    }
+
+    private fun buildLinkedFaceRigPoseState(
+        nowMs: Long,
+        idleCycle: IdleCycleState,
+        breathSin: Float,
+        blinkWeight: Float
+    ): RigPoseState {
+        // When idle in normal emotion, subtly preview linked expressions (coucou->joie, malice, etirement, baillement->fatigue)
+        val effectiveTarget = if (currentEmotion == Live2dEmotion.EMOTION_NORMAL && idleCycle.gesture != IdleGesture.NONE) {
+            val idleExprName = when (idleCycle.gesture) {
+                IdleGesture.COUCOU -> Live2dEmotion.EMOTION_JOIE
+                IdleGesture.ETIREMENT -> Live2dEmotion.EMOTION_ETIREMENT
+                IdleGesture.MALICE -> Live2dEmotion.EMOTION_MALICE
+                IdleGesture.BAILLEMENT -> Live2dEmotion.EMOTION_FATIGUE
+                IdleGesture.NONE -> Live2dEmotion.EMOTION_NORMAL
+            }
+            val idleExpr = faceExpressions?.resolve(idleExprName) ?: currentFaceExpr
+            blendFaceExpressions(currentFaceExpr, idleExpr, idleCycle.weight)
+        } else {
+            val elapsed = if (transitionStartMs > 0L) (nowMs - transitionStartMs).coerceAtLeast(0L) else faceTransitionMs
+            val rawT = (elapsed.toFloat() / faceTransitionMs.coerceAtLeast(80L).toFloat()).coerceIn(0f, 1f)
+            val smoothT = rawT * rawT * (3f - 2f * rawT)
+            blendFaceExpressions(previousFaceExpr, currentFaceExpr, smoothT)
+        }
+
+        val isSleepy = effectiveTarget.eyeLidVariant == 1
+        val fullLeftLid = if (isSleepy) blinkWeight else kotlin.math.max(blinkWeight, 1f - effectiveTarget.eyeLOpen)
+        val fullRightLid = if (isSleepy) blinkWeight else kotlin.math.max(blinkWeight, 1f - effectiveTarget.eyeROpen)
+        val sleepyWeight = if (isSleepy) 1f else 0f
+
+        return RigPoseState(
+            headYawDeg = effectiveTarget.angleX + smoothDragX * 9.5f,
+            headPitchDeg = effectiveTarget.angleY - smoothDragY * 6.0f,
+            headRollDeg = effectiveTarget.angleZ + smoothDragX * 2.8f,
+            pupilShiftX = effectiveTarget.eyeBallX * 0.011f,
+            pupilShiftY = effectiveTarget.eyeBallY * 0.007f,
+            pupilScale = effectiveTarget.pupilScale,
+            leftLidWeight = fullLeftLid.coerceIn(0f, 1f),
+            rightLidWeight = fullRightLid.coerceIn(0f, 1f),
+            sleepyLidWeight = sleepyWeight,
+            browLiftY = breathSin * 0.0010f,
+            leftBrowOffsetY = effectiveTarget.browLY * 0.012f,
+            rightBrowOffsetY = effectiveTarget.browRY * 0.012f,
+            leftBrowRollDeg = effectiveTarget.browLAngle * 16f,
+            rightBrowRollDeg = -effectiveTarget.browRAngle * 16f,
+            cheekAlpha = effectiveTarget.cheek.coerceIn(0f, 1f),
+            mouthLayerKey = resolveMouthLayerKey(effectiveTarget.mouthVariant)
+        )
+    }
+
+    private fun blendFaceExpressions(
+        from: AlitaFaceExpression,
+        to: AlitaFaceExpression,
+        t: Float
+    ): AlitaFaceExpression {
+        if (t <= 0.001f) return from
+        if (t >= 0.999f) return to
+        fun lerp(a: Float, b: Float): Float = a + (b - a) * t
+        return AlitaFaceExpression(
+            name = to.name,
+            fadeInMs = to.fadeInMs,
+            angleX = lerp(from.angleX, to.angleX),
+            angleY = lerp(from.angleY, to.angleY),
+            angleZ = lerp(from.angleZ, to.angleZ),
+            eyeLOpen = lerp(from.eyeLOpen, to.eyeLOpen),
+            eyeROpen = lerp(from.eyeROpen, to.eyeROpen),
+            eyeBallX = lerp(from.eyeBallX, to.eyeBallX),
+            eyeBallY = lerp(from.eyeBallY, to.eyeBallY),
+            pupilScale = lerp(from.pupilScale, to.pupilScale),
+            browLY = lerp(from.browLY, to.browLY),
+            browRY = lerp(from.browRY, to.browRY),
+            browLAngle = lerp(from.browLAngle, to.browLAngle),
+            browRAngle = lerp(from.browRAngle, to.browRAngle),
+            cheek = lerp(from.cheek, to.cheek),
+            mouthVariant = if (t < 0.35f) from.mouthVariant else to.mouthVariant,
+            eyeLidVariant = if (t < 0.35f) from.eyeLidVariant else to.eyeLidVariant
+        )
+    }
+
+    private fun resolveMouthLayerKey(variant: Int): String = when (variant) {
+        1 -> LAYER_MOUTH_JOIE
+        2 -> LAYER_MOUTH_COLERE
+        3 -> LAYER_MOUTH_MALICE
+        4 -> LAYER_MOUTH_SURPRISE
+        5 -> LAYER_MOUTH_SERIEUX
+        6 -> LAYER_MOUTH_CALME
+        7 -> LAYER_MOUTH_FATIGUE
+        else -> LAYER_MOUTH
     }
 
     private fun buildRigPoseState(
@@ -552,28 +720,55 @@ class SpriteAvatarRenderer {
         )
 
         head?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0f, 0.082f, alpha, 0.28f) }
+        if (pose.cheekAlpha > 0.02f) {
+            layerTextures[LAYER_CHEEK_BLUSH]?.let { blushTex ->
+                drawMeshPart(
+                    shader,
+                    blushTex,
+                    headMatrix,
+                    texAspect,
+                    0.010f,
+                    0.082f,
+                    alpha * pose.cheekAlpha.coerceIn(0f, 1f),
+                    0.08f
+                )
+            }
+        }
+
+        val eyePivotX = if (faceModelMode) EYE_PIVOT_X_FACE else EYE_PIVOT_X
+        val eyePivotY = if (faceModelMode) EYE_PIVOT_Y_FACE else EYE_PIVOT_Y
+        val browPivotX = if (faceModelMode) BROW_PIVOT_X_FACE else BROW_PIVOT_X
+        val browPivotY = if (faceModelMode) BROW_PIVOT_Y_FACE else BROW_PIVOT_Y
 
         // 5. Eyes & sclera
         leftEye?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.016f, 0.082f, alpha, 0.12f) }
         rightEye?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.016f, 0.082f, alpha, 0.12f) }
 
         // 6. Tracked natural brown pupils inside eye sockets (optional constricted scale for surprise)
-        val eyeLookX = (smoothDragX * 0.010f + pose.pupilShiftX).coerceIn(-0.011f, 0.011f)
-        val eyeLookY = (smoothDragY * 0.006f + pose.pupilShiftY).coerceIn(-0.007f, 0.007f)
-        if (pose.leftLidWeight < 0.85f) {
+        val eyeLookX = (smoothDragX * 0.010f + pose.pupilShiftX).coerceIn(-0.012f, 0.012f)
+        val eyeLookY = (smoothDragY * 0.006f + pose.pupilShiftY).coerceIn(-0.008f, 0.008f)
+        if (pose.leftLidWeight < 0.85f && pose.sleepyLidWeight < 0.5f) {
             leftPupil?.let {
-                buildPupilMatrix(headMatrix, partMatrix, -EYE_PIVOT_X, EYE_PIVOT_Y, eyeLookX, eyeLookY, pose.pupilScale)
+                buildPupilMatrix(headMatrix, partMatrix, -eyePivotX, eyePivotY, eyeLookX, eyeLookY, pose.pupilScale)
                 drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.16f)
             }
         }
-        if (pose.rightLidWeight < 0.85f) {
+        if (pose.rightLidWeight < 0.85f && pose.sleepyLidWeight < 0.5f) {
             rightPupil?.let {
-                buildPupilMatrix(headMatrix, partMatrix, EYE_PIVOT_X, EYE_PIVOT_Y, eyeLookX, eyeLookY, pose.pupilScale)
+                buildPupilMatrix(headMatrix, partMatrix, eyePivotX, eyePivotY, eyeLookX, eyeLookY, pose.pupilScale)
                 drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.16f)
             }
         }
 
-        // 7. True blinking & wink eyelids (paupiere_gauche / paupiere_droite)
+        // 7. Sleepy half-closed eyelids (fatigue) + true blinking & wink eyelids
+        if (pose.sleepyLidWeight > 0.05f) {
+            layerTextures[LAYER_LEFT_SLEEPY_LID]?.let {
+                drawMeshPart(shader, it, headMatrix, texAspect, 0.025f, 0.082f, alpha * pose.sleepyLidWeight.coerceIn(0f, 1f), 0.14f)
+            }
+            layerTextures[LAYER_RIGHT_SLEEPY_LID]?.let {
+                drawMeshPart(shader, it, headMatrix, texAspect, 0.025f, 0.082f, alpha * pose.sleepyLidWeight.coerceIn(0f, 1f), 0.14f)
+            }
+        }
         if (pose.leftLidWeight > 0.05f) {
             leftLid?.let {
                 drawMeshPart(shader, it, headMatrix, texAspect, 0.028f, 0.082f, alpha * pose.leftLidWeight.coerceIn(0f, 1f), 0.14f)
@@ -585,13 +780,27 @@ class SpriteAvatarRenderer {
             }
         }
 
-        // 8. Articulated eyebrows & expressive mouth (normal / joie / colere / malice / surprise)
+        // 8. Articulated eyebrows (height + Live2D tilt rotation) & expressive mouth
         leftBrow?.let {
-            Matrix.translateM(partMatrix, 0, headMatrix, 0, 0f, pose.browLiftY + pose.leftBrowOffsetY, 0.032f)
+            buildBrowMatrix(
+                base = headMatrix,
+                out = partMatrix,
+                pivotX = -browPivotX,
+                pivotY = browPivotY,
+                offsetY = pose.browLiftY + pose.leftBrowOffsetY,
+                rollDeg = pose.leftBrowRollDeg
+            )
             drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f)
         }
         rightBrow?.let {
-            Matrix.translateM(partMatrix, 0, headMatrix, 0, 0f, pose.browLiftY + pose.rightBrowOffsetY, 0.032f)
+            buildBrowMatrix(
+                base = headMatrix,
+                out = partMatrix,
+                pivotX = browPivotX,
+                pivotY = browPivotY,
+                offsetY = pose.browLiftY + pose.rightBrowOffsetY,
+                rollDeg = pose.rightBrowRollDeg
+            )
             drawMeshPart(shader, it, partMatrix, texAspect, 0f, 0.082f, alpha, 0.14f)
         }
         mouth?.let { drawMeshPart(shader, it, headMatrix, texAspect, 0.026f, 0.082f, alpha, 0.14f) }
@@ -743,8 +952,12 @@ class SpriteAvatarRenderer {
             val v = r.toFloat() / MESH_ROWS.toFloat()
             val y = halfH * (1f - 2f * v)
 
-            // Hair sway envelope: anchored at crown (v <= 0.11), growing along bangs & side locks
-            val hairT = ((v - 0.10f) / 0.18f).coerceIn(0f, 1f)
+            // Hair sway envelope: anchored at crown, growing along bangs & side locks
+            val hairT = if (faceModelMode) {
+                ((v - 0.17f) / 0.24f).coerceIn(0f, 1f)
+            } else {
+                ((v - 0.10f) / 0.18f).coerceIn(0f, 1f)
+            }
             val hairWeight = hairT.pow(1.45f)
 
             for (c in 0..MESH_COLS) {
@@ -863,11 +1076,27 @@ class SpriteAvatarRenderer {
         pitchDeg: Float,
         rollDeg: Float
     ) {
-        Matrix.translateM(out, 0, base, 0, 0f, HEAD_PIVOT_Y, zOffset)
+        val headPivotY = if (faceModelMode) HEAD_PIVOT_Y_FACE else HEAD_PIVOT_Y
+        Matrix.translateM(out, 0, base, 0, 0f, headPivotY, zOffset)
         Matrix.rotateM(out, 0, yawDeg, 0f, 1f, 0f)
         Matrix.rotateM(out, 0, pitchDeg, 1f, 0f, 0f)
         Matrix.rotateM(out, 0, rollDeg, 0f, 0f, 1f)
-        Matrix.translateM(out, 0, 0f, -HEAD_PIVOT_Y, 0f)
+        Matrix.translateM(out, 0, 0f, -headPivotY, 0f)
+    }
+
+    private fun buildBrowMatrix(
+        base: FloatArray,
+        out: FloatArray,
+        pivotX: Float,
+        pivotY: Float,
+        offsetY: Float,
+        rollDeg: Float
+    ) {
+        Matrix.translateM(out, 0, base, 0, pivotX, pivotY + offsetY, 0.032f)
+        if (kotlin.math.abs(rollDeg) > 0.05f) {
+            Matrix.rotateM(out, 0, rollDeg, 0f, 0f, 1f)
+        }
+        Matrix.translateM(out, 0, -pivotX, -pivotY, 0f)
     }
 
     private fun buildPivotedMatrix(
@@ -950,7 +1179,7 @@ class SpriteAvatarRenderer {
         val quad = ensureFallbackSprite(shaderProgramId)
         quad.setWindowSize(viewWidth, viewHeight)
         val aspect = activeTex.width.toFloat() / activeTex.height.toFloat().coerceAtLeast(1f)
-        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive)
+        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive, isFaceModel = faceModelMode)
         val maxH = viewHeight * framing.fallbackMaxHFactor
         val maxW = viewWidth * framing.fallbackMaxWFactor
         var drawH = maxH
@@ -1007,9 +1236,13 @@ class SpriteAvatarRenderer {
         val pupilScale: Float = 1f,
         val leftLidWeight: Float = 0f,
         val rightLidWeight: Float = 0f,
+        val sleepyLidWeight: Float = 0f,
         val browLiftY: Float = 0f,
         val leftBrowOffsetY: Float = 0f,
         val rightBrowOffsetY: Float = 0f,
+        val leftBrowRollDeg: Float = 0f,
+        val rightBrowRollDeg: Float = 0f,
+        val cheekAlpha: Float = 0f,
         val mouthLayerKey: String = LAYER_MOUTH
     )
 
@@ -1028,6 +1261,15 @@ class SpriteAvatarRenderer {
         private const val ARM_PIVOT_Y = 0.36f
         private const val EYE_PIVOT_X = 0.0665f
         private const val EYE_PIVOT_Y = 0.6275f
+        private const val BROW_PIVOT_X = 0.0665f
+        private const val BROW_PIVOT_Y = 0.668f
+
+        // Calibrated pivots for 520x520 portrait bust (live2d/alita_face_live2d/)
+        private const val HEAD_PIVOT_Y_FACE = -0.181f
+        private const val EYE_PIVOT_X_FACE = 0.154f
+        private const val EYE_PIVOT_Y_FACE = 0.248f
+        private const val BROW_PIVOT_X_FACE = 0.158f
+        private const val BROW_PIVOT_Y_FACE = 0.340f
 
         private const val MESH_COLS = 16
         private const val MESH_ROWS = 20
@@ -1038,12 +1280,15 @@ class SpriteAvatarRenderer {
         private const val LAYER_LEFT_ARM = "bras_main_gauche"
         private const val LAYER_RIGHT_ARM = "bras_main_droit"
         private const val LAYER_HEAD = "tete"
+        private const val LAYER_CHEEK_BLUSH = "joues_colere"
         private const val LAYER_LEFT_EYE = "oeil_gauche"
         private const val LAYER_RIGHT_EYE = "oeil_droit"
         private const val LAYER_LEFT_PUPIL = "pupille_gauche"
         private const val LAYER_RIGHT_PUPIL = "pupille_droite"
         private const val LAYER_LEFT_EYELID = "paupiere_gauche"
         private const val LAYER_RIGHT_EYELID = "paupiere_droite"
+        private const val LAYER_LEFT_SLEEPY_LID = "paupiere_fatigue_gauche"
+        private const val LAYER_RIGHT_SLEEPY_LID = "paupiere_fatigue_droite"
         private const val LAYER_LEFT_BROW = "sourcil_gauche"
         private const val LAYER_RIGHT_BROW = "sourcil_droit"
         private const val LAYER_MOUTH = "bouche"
@@ -1051,7 +1296,35 @@ class SpriteAvatarRenderer {
         private const val LAYER_MOUTH_COLERE = "bouche_colere"
         private const val LAYER_MOUTH_MALICE = "bouche_malice"
         private const val LAYER_MOUTH_SURPRISE = "bouche_surprise"
+        private const val LAYER_MOUTH_SERIEUX = "bouche_serieux"
+        private const val LAYER_MOUTH_CALME = "bouche_calme"
+        private const val LAYER_MOUTH_FATIGUE = "bouche_fatigue"
         private const val LAYER_HAIR = "meches_cheveux"
+
+        private val FACE_LAYER_NAMES = listOf(
+            LAYER_TORSO,
+            LAYER_HEAD,
+            LAYER_CHEEK_BLUSH,
+            LAYER_LEFT_EYE,
+            LAYER_RIGHT_EYE,
+            LAYER_LEFT_PUPIL,
+            LAYER_RIGHT_PUPIL,
+            LAYER_LEFT_EYELID,
+            LAYER_RIGHT_EYELID,
+            LAYER_LEFT_SLEEPY_LID,
+            LAYER_RIGHT_SLEEPY_LID,
+            LAYER_LEFT_BROW,
+            LAYER_RIGHT_BROW,
+            LAYER_MOUTH,
+            LAYER_MOUTH_JOIE,
+            LAYER_MOUTH_COLERE,
+            LAYER_MOUTH_MALICE,
+            LAYER_MOUTH_SURPRISE,
+            LAYER_MOUTH_SERIEUX,
+            LAYER_MOUTH_CALME,
+            LAYER_MOUTH_FATIGUE,
+            LAYER_HAIR
+        )
 
         private val LAYER_NAMES = listOf(
             LAYER_TORSO,
@@ -1148,7 +1421,41 @@ class SpriteAvatarRenderer {
             val fallbackCenterYFactor: Float
         )
 
-        internal fun resolveFraming(isOverlay: Boolean, isImmersive: Boolean): AvatarFraming = when {
+        internal fun resolveFraming(
+            isOverlay: Boolean,
+            isImmersive: Boolean,
+            isFaceModel: Boolean = false
+        ): AvatarFraming = when {
+            isFaceModel && isOverlay -> AvatarFraming(
+                fillH = 1.00f,
+                fillW = 0.96f,
+                shiftXFraction = 0.0f,
+                shiftYFraction = 0.0f,
+                aspectWidthFactor = 0.86f,
+                fallbackMaxHFactor = 0.96f,
+                fallbackMaxWFactor = 0.96f,
+                fallbackCenterYFactor = 0.50f
+            )
+            isFaceModel && isImmersive -> AvatarFraming(
+                fillH = 1.00f,
+                fillW = 0.98f,
+                shiftXFraction = 0.0f,
+                shiftYFraction = 0.04f,
+                aspectWidthFactor = 0.84f,
+                fallbackMaxHFactor = 0.92f,
+                fallbackMaxWFactor = 0.98f,
+                fallbackCenterYFactor = 0.46f
+            )
+            isFaceModel -> AvatarFraming(
+                fillH = 0.94f,
+                fillW = 0.96f,
+                shiftXFraction = 0.0f,
+                shiftYFraction = -0.02f,
+                aspectWidthFactor = 0.92f,
+                fallbackMaxHFactor = 0.90f,
+                fallbackMaxWFactor = 0.94f,
+                fallbackCenterYFactor = 0.50f
+            )
             isOverlay -> AvatarFraming(
                 fillH = 1.02f,
                 fillW = 0.99f,

@@ -277,6 +277,8 @@ internal fun Live2dModelSection(
                         val label = when {
                             model.id == Live2dModelStore.ALITA_SPRITE_MODEL_ID ->
                                 stringResource(R.string.live2d_alita_builtin_name)
+                            model.id == Live2dModelStore.ALITA_FACE_MODEL_ID ->
+                                stringResource(R.string.live2d_alita_face_builtin_name)
                             model.isBuiltIn ->
                                 stringResource(R.string.live2d_builtin_name)
                             else ->
@@ -288,12 +290,17 @@ internal fun Live2dModelSection(
                             fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (isActive || model.renderType == AvatarRenderType.SPRITE_2D) {
+                        val modeBadgeRes = when (model.renderType) {
+                            AvatarRenderType.SPRITE_2D -> R.string.live2d_sprite_2d_badge
+                            AvatarRenderType.ALITA_FACE_LIVE2D -> R.string.live2d_face_live2d_badge
+                            AvatarRenderType.LIVE2D -> null
+                        }
+                        if (isActive || modeBadgeRes != null) {
                             val subText = buildString {
                                 if (isActive) append(stringResource(R.string.live2d_active_badge))
-                                if (model.renderType == AvatarRenderType.SPRITE_2D) {
+                                if (modeBadgeRes != null) {
                                     if (isNotEmpty()) append(" · ")
-                                    append(stringResource(R.string.live2d_sprite_2d_badge))
+                                    append(stringResource(modeBadgeRes))
                                 }
                             }
                             Text(

@@ -57,21 +57,29 @@ class Live2dModelStoreTest {
         assertTrue(File(spec.dirPath, "hiyori.2048/texture_00.png").isFile)
 
         val models = store.listModels()
-        assertEquals(3, models.size)
+        assertEquals(4, models.size)
         assertTrue(models[0].isBuiltIn)
         assertEquals(AvatarRenderType.LIVE2D, models[0].renderType)
         assertTrue(models[1].isBuiltIn)
         assertEquals(Live2dModelStore.ALITA_SPRITE_MODEL_ID, models[1].id)
         assertEquals(AvatarRenderType.SPRITE_2D, models[1].renderType)
-        assertEquals(spec.id, models[2].id)
+        assertTrue(models[2].isBuiltIn)
+        assertEquals(Live2dModelStore.ALITA_FACE_MODEL_ID, models[2].id)
+        assertEquals(AvatarRenderType.ALITA_FACE_LIVE2D, models[2].renderType)
+        assertEquals("alita_face.model3.json", models[2].modelJsonName)
+        assertEquals(spec.id, models[3].id)
         assertEquals(spec.id, store.findById(spec.id).id)
         assertEquals(
             Live2dModelStore.ALITA_SPRITE_MODEL_ID,
             store.findById(Live2dModelStore.ALITA_SPRITE_MODEL_ID).id
         )
+        assertEquals(
+            Live2dModelStore.ALITA_FACE_MODEL_ID,
+            store.findById(Live2dModelStore.ALITA_FACE_MODEL_ID).id
+        )
 
         assertTrue(store.deleteModel(spec.id))
-        assertEquals(2, store.listModels().size)
+        assertEquals(3, store.listModels().size)
         assertTrue(store.findById(spec.id).isBuiltIn)
     }
 

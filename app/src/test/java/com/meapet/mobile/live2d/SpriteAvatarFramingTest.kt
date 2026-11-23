@@ -58,4 +58,28 @@ class SpriteAvatarFramingTest {
         assertEquals(1.02f, overlay.fillH, 0.0001f)
         assertEquals(0.018f, overlay.shiftXFraction, 0.0001f)
     }
+
+    @Test
+    fun `face live2d model uses dedicated bust framing across normal, immersive and overlay modes`() {
+        val normalFace = SpriteAvatarRenderer.resolveFraming(
+            isOverlay = false,
+            isImmersive = false,
+            isFaceModel = true
+        )
+        val immersiveFace = SpriteAvatarRenderer.resolveFraming(
+            isOverlay = false,
+            isImmersive = true,
+            isFaceModel = true
+        )
+        val overlayFace = SpriteAvatarRenderer.resolveFraming(
+            isOverlay = true,
+            isImmersive = true,
+            isFaceModel = true
+        )
+
+        assertEquals(0.94f, normalFace.fillH, 0.0001f)
+        assertEquals(1.00f, immersiveFace.fillH, 0.0001f)
+        assertEquals(1.00f, overlayFace.fillH, 0.0001f)
+        assertTrue(immersiveFace.shiftYFraction > normalFace.shiftYFraction)
+    }
 }

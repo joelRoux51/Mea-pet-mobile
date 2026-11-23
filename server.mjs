@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 const HOST = '0.0.0.0';
 const ASSETS_ROOT = path.join(__dirname, 'public', 'assets', 'alita_live2d');
 

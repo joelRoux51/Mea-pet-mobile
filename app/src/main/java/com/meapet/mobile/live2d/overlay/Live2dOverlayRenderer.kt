@@ -131,7 +131,7 @@ class Live2dOverlayRenderer(
 
             if (winWidth <= 0 || winHeight <= 0) return
 
-            if (loadedSpec?.renderType == AvatarRenderType.SPRITE_2D) {
+            if (loadedSpec?.renderType?.isAlitaSpriteFamily == true) {
                 GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
                 GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
                 Live2dManager.getInstance().latestEmotionRequest()?.let { req ->
@@ -217,14 +217,15 @@ class Live2dOverlayRenderer(
         try {
             val dir = spec.dirPath
             val tm = textureManager ?: return
-            if (spec.renderType == AvatarRenderType.SPRITE_2D) {
-                val ok = spriteRenderer.load(dir, tm)
+            if (spec.renderType.isAlitaSpriteFamily) {
+                val isFaceModel = spec.renderType == AvatarRenderType.ALITA_FACE_LIVE2D
+                val ok = spriteRenderer.load(dir, tm, isFaceModel = isFaceModel)
                 if (!ok) {
-                    throw IllegalStateException("Failed to load 2D sprite textures from $dir")
+                    throw IllegalStateException("Failed to load sprite/face textures from $dir")
                 }
                 model = null
                 loadedSpec = spec
-                Log.d(TAG, "Overlay 2D sprite avatar loaded: ${spec.displayName}")
+                Log.d(TAG, "Overlay sprite/face avatar loaded: ${spec.displayName} (face=$isFaceModel)")
                 return
             }
             val fileName = spec.modelJsonName

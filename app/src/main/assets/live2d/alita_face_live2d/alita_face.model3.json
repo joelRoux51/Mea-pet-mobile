@@ -1,0 +1,71 @@
+{
+  "Version": 3,
+  "Type": 0,
+  "FileReferences": {
+    "PortraitBustSize": 520,
+    "LayersDir": "layers",
+    "Expressions": [
+      {
+        "Name": "normal",
+        "File": "expressions/normal.exp3.json"
+      },
+      {
+        "Name": "joie",
+        "File": "expressions/joie.exp3.json"
+      },
+      {
+        "Name": "serieux",
+        "File": "expressions/serieux.exp3.json"
+      },
+      {
+        "Name": "colere",
+        "File": "expressions/colere.exp3.json"
+      },
+      {
+        "Name": "calme",
+        "File": "expressions/calme.exp3.json"
+      },
+      {
+        "Name": "fatigue",
+        "File": "expressions/fatigue.exp3.json"
+      },
+      {
+        "Name": "malice",
+        "File": "expressions/malice.exp3.json"
+      },
+      {
+        "Name": "etirement",
+        "File": "expressions/etirement.exp3.json"
+      },
+      {
+        "Name": "surprise",
+        "File": "expressions/surprise.exp3.json"
+      },
+      {
+        "Name": "curiosite",
+        "File": "expressions/curiosite.exp3.json"
+      },
+      {
+        "Name": "clin_doeil",
+        "File": "expressions/clin_doeil.exp3.json"
+      }
+    ]
+  },
+  "Controllers": {
+    "EyeBlink": {
+      "MinInterval": 500,
+      "MaxInterval": 6000,
+      "Enabled": true
+    },
+    "MouseTracking": {
+      "SmoothTime": 0.15,
+      "Enabled": true
+    },
+    "AutoBreath": {
+      "Enabled": true
+    },
+    "FaceTracking": {
+      "Enabled": true
+    }
+  }
+}

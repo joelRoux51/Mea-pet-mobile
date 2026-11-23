@@ -144,16 +144,21 @@ class Live2dManager private constructor() {
         val spec = activeSpec
         if (modelLoaded && loadedSpec == spec) return
         val dir = spec.dirPath
-        if (spec.renderType == AvatarRenderType.SPRITE_2D) {
-            Log.d(TAG, "Loading 2D sprite avatar from: $dir")
-            val ok = spriteRenderer.load(dir, Live2dDelegate.getInstance().textureManager)
+        if (spec.renderType.isAlitaSpriteFamily) {
+            val isFaceModel = spec.renderType == AvatarRenderType.ALITA_FACE_LIVE2D
+            Log.d(TAG, "Loading 2D/Face sprite avatar from: $dir (face=$isFaceModel)")
+            val ok = spriteRenderer.load(
+                dirPath = dir,
+                textureManager = Live2dDelegate.getInstance().textureManager,
+                isFaceModel = isFaceModel
+            )
             if (ok) {
                 model = null
                 loadedSpec = spec
                 modelLoaded = true
-                Log.d(TAG, "2D sprite avatar loaded successfully: ${spec.displayName}")
+                Log.d(TAG, "Sprite/Face avatar loaded successfully: ${spec.displayName}")
             } else {
-                Log.e(TAG, "Failed to load 2D sprite avatar: ${spec.displayName}")
+                Log.e(TAG, "Failed to load sprite/face avatar: ${spec.displayName}")
                 activeSpec = Live2dModelStore.BUILT_IN_MODEL
                 loadedSpec = null
                 modelLoaded = false
@@ -200,7 +205,7 @@ class Live2dManager private constructor() {
 
         checkAutoCalmFromTap()
 
-        if (loadedSpec?.renderType == AvatarRenderType.SPRITE_2D) {
+        if (loadedSpec?.renderType?.isAlitaSpriteFamily == true) {
             latestEmotionRef.get()?.let { req ->
                 if (req.sequence != lastAppliedMainSequence) {
                     lastAppliedMainSequence = req.sequence

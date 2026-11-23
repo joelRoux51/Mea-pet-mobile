@@ -130,6 +130,8 @@
     <string name="live2d_builtin_name">Mea (Built-in)</string>
     <string name="live2d_alita_builtin_name">Alita 2D (Built-in)</string>
     <string name="live2d_sprite_2d_badge">2D Sprite Avatar (PNG)</string>
+    <string name="live2d_alita_face_builtin_name">Alita Face Live2D (Built-in)</string>
+    <string name="live2d_face_live2d_badge">Interactive 3D Face · 11 Linked Expressions</string>
     <string name="live2d_import_zip">Import .zip model</string>
     <string name="live2d_importing">Importing model…</string>
     <string name="live2d_active_badge">Active</string>

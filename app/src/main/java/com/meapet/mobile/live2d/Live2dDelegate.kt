@@ -315,22 +315,25 @@ class Live2dDelegate private constructor() {
         val nx = (x / windowWidth) * 2f - 1f
         val ny = -((y / windowHeight) * 2f - 1f)
 
-        val isAlita = Live2dManager.getInstance().activeSpec.renderType == AvatarRenderType.SPRITE_2D
+        val renderType = Live2dManager.getInstance().activeSpec.renderType
+        val isAlita = renderType.isAlitaSpriteFamily
+        val isAlitaFace = renderType == AvatarRenderType.ALITA_FACE_LIVE2D
         if (isImmersive) {
-            if (isAlita) {
-                if (nx < -0.92f || nx > 0.92f || ny < -0.96f || ny > 0.96f) return null
-            } else {
-                if (nx < -0.78f || nx > 0.78f || ny < -0.92f || ny > 0.92f) return null
+            when {
+                isAlitaFace -> if (nx < -0.88f || nx > 0.88f || ny < -0.72f || ny > 0.82f) return null
+                isAlita -> if (nx < -0.92f || nx > 0.92f || ny < -0.96f || ny > 0.96f) return null
+                else -> if (nx < -0.78f || nx > 0.78f || ny < -0.92f || ny > 0.92f) return null
             }
         } else {
-            if (isAlita) {
-                if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
-            } else {
-                if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
+            when {
+                isAlitaFace -> if (nx < -0.82f || nx > 0.82f || ny < -0.72f || ny > 0.72f) return null
+                isAlita -> if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
+                else -> if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
             }
         }
 
         val splitY = when {
+            isAlitaFace -> 0.08f
             isImmersive && isAlita -> 0.22f
             isImmersive -> 0.05f
             isAlita -> 0.18f

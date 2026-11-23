@@ -1,0 +1,82 @@
+{
+  "Type": "Live2D Expression",
+  "FadeInTime": 0.28,
+  "FadeOutTime": 0.28,
+  "Parameters": [
+    {
+      "Id": "ParamAngleX",
+      "Value": 2.5,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamAngleY",
+      "Value": 2.8,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamAngleZ",
+      "Value": 4.5,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeLOpen",
+      "Value": 1.0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeROpen",
+      "Value": 1.0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeBallX",
+      "Value": 0.0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeBallY",
+      "Value": 0.08,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamPupilScale",
+      "Value": 1.05,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowLY",
+      "Value": 0.55,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowRY",
+      "Value": 0.55,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowLAngle",
+      "Value": 0.22,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamBrowRAngle",
+      "Value": 0.22,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamCheek",
+      "Value": 0.3,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamMouthVariant",
+      "Value": 1.0,
+      "Blend": "Overwrite"
+    },
+    {
+      "Id": "ParamEyeLidVariant",
+      "Value": 0.0,
+      "Blend": "Overwrite"
+    }
+  ]
+}
