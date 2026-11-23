@@ -90,6 +90,7 @@ class SettingsViewModelTest {
         whenever(settingsManager.isTtsOverlayEnabled()).thenReturn(false)
         whenever(settingsManager.getTtsLengthScale()).thenReturn(1.0)
         whenever(settingsManager.getChatBubbleAlpha()).thenReturn(1.0)
+        whenever(settingsManager.getDisplayMode()).thenReturn(SettingsKeys.Defaults.DISPLAY_MODE)
         whenever(settingsManager.isAutoUpdateCheckEnabled()).thenReturn(true)
         whenever(settingsManager.getWallpaperPath()).thenReturn("")
         whenever(settingsManager.getWallpaperBlur()).thenReturn(0.0)
@@ -114,6 +115,7 @@ class SettingsViewModelTest {
         whenever(settingsManager.ttsOverlayEnabledFlow).thenReturn(MutableStateFlow(false))
         whenever(settingsManager.ttsLengthScaleFlow).thenReturn(MutableStateFlow(1.0))
         whenever(settingsManager.chatBubbleAlphaFlow).thenReturn(MutableStateFlow(1.0))
+        whenever(settingsManager.displayModeFlow).thenReturn(MutableStateFlow(SettingsKeys.Defaults.DISPLAY_MODE))
         whenever(settingsManager.enableAutoUpdateCheckFlow).thenReturn(MutableStateFlow(true))
         whenever(settingsManager.wallpaperPathFlow).thenReturn(MutableStateFlow(""))
         whenever(settingsManager.wallpaperBlurFlow).thenReturn(MutableStateFlow(0.0))
@@ -323,5 +325,23 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceTimeBy(UNDO_WINDOW_MS + 1)
         dispatcher.scheduler.runCurrent()
         verify(wallpaperStore, never()).clearAll()
+    }
+
+    @Test
+    fun `updateDisplayMode switches between immersive and normal and normalizes invalid modes`() = runTest(dispatcher.scheduler) {
+        val vm = FakeSettingsViewModel(application)
+        assertEquals(SettingsKeys.DISPLAY_MODE_NORMAL, vm.state.value.displayMode)
+
+        vm.updateDisplayMode(SettingsKeys.DISPLAY_MODE_IMMERSIVE)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        verifyBlocking(settingsManager) { setDisplayMode(SettingsKeys.DISPLAY_MODE_IMMERSIVE) }
+        assertEquals(SettingsKeys.DISPLAY_MODE_IMMERSIVE, vm.state.value.displayMode)
+
+        vm.updateDisplayMode("unknown_mode")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        verifyBlocking(settingsManager) { setDisplayMode(SettingsKeys.DISPLAY_MODE_NORMAL) }
+        assertEquals(SettingsKeys.DISPLAY_MODE_NORMAL, vm.state.value.displayMode)
     }
 }

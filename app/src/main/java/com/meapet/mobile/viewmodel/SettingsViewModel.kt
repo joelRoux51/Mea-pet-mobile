@@ -79,6 +79,7 @@ data class SettingsUiState(
     val ttsModelUrlConfigured: Boolean = false,
     // ── 界面外观 ──
     val chatBubbleAlpha: Double = SettingsKeys.Defaults.CHAT_BUBBLE_ALPHA,
+    val displayMode: String = SettingsKeys.Defaults.DISPLAY_MODE,
     // ── 更新 ──
     val enableAutoUpdateCheck: Boolean = SettingsKeys.Defaults.ENABLE_AUTO_UPDATE_CHECK,
     val isCheckingUpdate: Boolean = false,
@@ -182,6 +183,7 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
             ttsModelState = ttsModelManager.state.value,
             ttsModelUrlConfigured = container.config.ttsModelBaseUrl.isNotBlank(),
             chatBubbleAlpha = settingsManager.getChatBubbleAlpha(),
+            displayMode = settingsManager.getDisplayMode() ?: SettingsKeys.Defaults.DISPLAY_MODE,
             enableAutoUpdateCheck = settingsManager.isAutoUpdateCheckEnabled(),
             wallpaperPath = settingsManager.getWallpaperPath(),
             wallpaperBlur = settingsManager.getWallpaperBlur(),
@@ -219,6 +221,7 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
 
         // 界面外观
         subscribe(settingsManager.chatBubbleAlphaFlow) { s, v -> s.copy(chatBubbleAlpha = v) }
+        subscribe(settingsManager.displayModeFlow) { s, mode -> s.copy(displayMode = mode) }
 
         // 更新
         subscribe(settingsManager.enableAutoUpdateCheckFlow) { s, e -> s.copy(enableAutoUpdateCheck = e) }
@@ -391,6 +394,19 @@ open class SettingsViewModel(application: Application) : AndroidViewModel(applic
     /** 更新主页聊天气泡透明度（0.2~1.0）。 */
     fun updateChatBubbleAlpha(alpha: Double) {
         viewModelScope.launch { settingsManager.setChatBubbleAlpha(alpha) }
+    }
+
+    /** Met à jour le mode d'affichage ("normal" | "immersive"). */
+    fun updateDisplayMode(mode: String) {
+        val normalized = if (mode == SettingsKeys.DISPLAY_MODE_IMMERSIVE) {
+            SettingsKeys.DISPLAY_MODE_IMMERSIVE
+        } else {
+            SettingsKeys.DISPLAY_MODE_NORMAL
+        }
+        viewModelScope.launch {
+            settingsManager.setDisplayMode(normalized)
+            _state.update { it.copy(displayMode = normalized) }
+        }
     }
 
     /** 切换启动自动检查更新（默认开启）。 */

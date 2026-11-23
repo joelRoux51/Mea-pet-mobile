@@ -10,7 +10,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,13 +56,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -69,9 +78,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meapet.mobile.R
 import com.meapet.mobile.app.MeaPetApplication
 import com.meapet.mobile.chat.CharacterBubbleUi
-import com.meapet.mobile.viewmodel.ChatEvent
+import com.meapet.mobile.chat.ChatRole
 import com.meapet.mobile.chat.ChatUiState
 import com.meapet.mobile.chat.MemoryDialogUi
+import com.meapet.mobile.live2d.Live2dDelegate
+import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.memory.MemoryType
 import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.ui.component.AppSnackbarHost
@@ -81,7 +92,9 @@ import com.meapet.mobile.ui.component.ErrorBubble
 import com.meapet.mobile.ui.component.OverlayMenu
 import com.meapet.mobile.ui.component.UndoSnackbarEffect
 import com.meapet.mobile.ui.screen.settings.SettingsScreen
+import com.meapet.mobile.viewmodel.ChatEvent
 import com.meapet.mobile.viewmodel.ChatViewModel
+import kotlinx.coroutines.delay
 
 /** 内部页面导航。 */
 private enum class Page { CHAT, SETTINGS }
@@ -94,10 +107,13 @@ private enum class Page { CHAT, SETTINGS }
  */
 @Composable
 fun ChatScreenContent(
+    displayMode: String = SettingsKeys.Defaults.DISPLAY_MODE,
+    onToggleImmersiveMode: () -> Unit = {},
     onToggleOverlay: () -> Unit = {},
     chatViewModel: ChatViewModel = viewModel()
 ) {
     var currentPage by remember { mutableStateOf(Page.CHAT) }
+    val isImmersive = displayMode == SettingsKeys.DISPLAY_MODE_IMMERSIVE
 
     // 后台切前台时固定刷新一次聊天历史：悬浮窗期间对话发生在共享的会话里，
     // 主界面内存状态不会自动同步。ON_RESUME 每次前台都会触发（首次启动时
@@ -122,6 +138,9 @@ fun ChatScreenContent(
     // 切换页面时同步触摸分区开关（设置页内禁止穿透）——经 ViewModel 访问领域单例
     LaunchedEffect(currentPage) {
         chatViewModel.updateZoneTouchEnabled(currentPage == Page.CHAT)
+        if (currentPage != Page.CHAT) {
+            Live2dDelegate.getInstance().touchExclusionTopY = Float.MAX_VALUE
+        }
     }
 
     AnimatedContent(
@@ -147,11 +166,14 @@ fun ChatScreenContent(
                     // 取消数据采集授权后需立即终止进程：友盟 SDK 有独立上报线程，
                     // 仅 finish 页面无法保证其立即停止，kill 是隐私合规的兜底
                     exitAppSilently()
-                }
+                },
+                onToggleOverlay = onToggleOverlay
             )
 
             Page.CHAT -> ChatPage(
                 chatViewModel = chatViewModel,
+                isImmersive = isImmersive,
+                onToggleImmersiveMode = onToggleImmersiveMode,
                 onToggleOverlay = onToggleOverlay,
                 onOpenSettings = { currentPage = Page.SETTINGS }
             )
@@ -165,12 +187,23 @@ fun ChatScreenContent(
 @Composable
 private fun ChatPage(
     chatViewModel: ChatViewModel,
+    isImmersive: Boolean,
+    onToggleImmersiveMode: () -> Unit,
     onToggleOverlay: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val state by chatViewModel.state.collectAsState()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    DisposableEffect(isImmersive) {
+        if (!isImmersive) {
+            Live2dDelegate.getInstance().touchExclusionTopY = Float.MAX_VALUE
+        }
+        onDispose {
+            Live2dDelegate.getInstance().touchExclusionTopY = Float.MAX_VALUE
+        }
+    }
 
     // 破坏性操作是「立即执行 + 可撤销」：执行结果与撤销快照都在
     // state.pendingUndo 里，本页只负责把撤销条显示出来。
@@ -189,9 +222,86 @@ private fun ChatPage(
     val bubbleAlphaState = bubbleAlphaFlow.collectAsState(initial = SettingsKeys.Defaults.CHAT_BUBBLE_ALPHA)
     val bubbleAlpha = bubbleAlphaState.value.toFloat()
 
+    // Visual-novel dialogue bubble in Immersive mode: displays webhook pushes, tap reactions, or new replies above the character
+    var immersiveVnBubble by remember { mutableStateOf<CharacterBubbleUi?>(null) }
+    var lastHandledSystemId by remember { mutableStateOf<String?>(null) }
+    var lastHandledAssistantId by remember {
+        mutableStateOf(state.messages.lastOrNull { it.role == ChatRole.assistant }?.id)
+    }
+
+    val characterDisplayName = remember(state.messages.size, isImmersive) {
+        Live2dManager.getInstance().activeSpec.displayName
+            .removeSuffix(" (2D)")
+            .ifBlank { "Mea" }
+    }
+
+    val latestSystemMsg = state.messages.lastOrNull { it.role == ChatRole.system }
+    val latestAssistantMsg = state.messages.lastOrNull { it.role == ChatRole.assistant }
+
+    LaunchedEffect(isImmersive, latestSystemMsg?.id, latestSystemMsg?.content) {
+        if (!isImmersive) {
+            immersiveVnBubble = null
+            lastHandledSystemId = latestSystemMsg?.id
+            return@LaunchedEffect
+        }
+        if (latestSystemMsg != null && latestSystemMsg.id != lastHandledSystemId) {
+            lastHandledSystemId = latestSystemMsg.id
+            immersiveVnBubble = CharacterBubbleUi(
+                id = latestSystemMsg.id,
+                sender = characterDisplayName,
+                text = latestSystemMsg.content,
+                isTelegram = false
+            )
+        } else if (latestSystemMsg == null && immersiveVnBubble?.id == lastHandledSystemId) {
+            immersiveVnBubble = null
+        }
+    }
+
+    LaunchedEffect(
+        isImmersive,
+        latestAssistantMsg?.id,
+        latestAssistantMsg?.content,
+        latestAssistantMsg?.isStreaming
+    ) {
+        if (!isImmersive) {
+            lastHandledAssistantId = latestAssistantMsg?.id
+            return@LaunchedEffect
+        }
+        if (latestAssistantMsg != null && latestAssistantMsg.content.isNotBlank()) {
+            val isNewReply = latestAssistantMsg.id != lastHandledAssistantId
+            val isUpdatingCurrentVn = immersiveVnBubble?.id == latestAssistantMsg.id
+            if (isNewReply || isUpdatingCurrentVn) {
+                lastHandledAssistantId = latestAssistantMsg.id
+                immersiveVnBubble = CharacterBubbleUi(
+                    id = latestAssistantMsg.id,
+                    sender = characterDisplayName,
+                    text = latestAssistantMsg.content,
+                    isTelegram = latestAssistantMsg.isFromTelegram
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(immersiveVnBubble?.id, immersiveVnBubble?.text, latestAssistantMsg?.isStreaming) {
+        val active = immersiveVnBubble ?: return@LaunchedEffect
+        val isActiveStreaming = latestAssistantMsg?.id == active.id && latestAssistantMsg.isStreaming
+        if (!isActiveStreaming) {
+            delay(9_000L)
+            if (immersiveVnBubble?.id == active.id) {
+                immersiveVnBubble = null
+            }
+        }
+    }
+
+    val activeCharacterBubble = if (isImmersive) {
+        state.characterBubble ?: immersiveVnBubble
+    } else {
+        state.characterBubble
+    }
+
     // 新消息或错误卡片出现时自动滚动到底部。
     // 错误卡片是列表末尾的额外 item，所以它出现时也要滚一次，否则用户看不到重试按钮。
-    LaunchedEffect(state.messages.size, state.error) {
+    LaunchedEffect(state.messages.size, state.error, isImmersive) {
         val lastIndex = state.messages.size - 1 + if (state.error != null) 1 else 0
         if (lastIndex >= 0) {
             listState.animateScrollToItem(lastIndex)
@@ -223,34 +333,77 @@ private fun ChatPage(
     // 整页躲开软键盘：输入栏、撤销条、消息列表都随键盘收窄（窗口不再替我们
     // resize/pan，见 MainActivity 的 edge-to-edge 说明）
     Box(modifier = Modifier.fillMaxSize().imePadding()) {
-        // ── Layer 1: 消息列表 ──
-        MessageList(
-            state = state,
-            listState = listState,
-            bubbleAlpha = bubbleAlpha,
-            onDismissError = { chatViewModel.onEvent(ChatEvent.DismissError) },
-            onRetry = { chatViewModel.onEvent(ChatEvent.RetryLastMessage) }
-        )
+        if (isImmersive) {
+            // ── Immersive Mode: Bottom floating glassmorphism chat panel over full-height character ──
+            ImmersiveBottomChatPanel(
+                state = state,
+                listState = listState,
+                bubbleAlpha = bubbleAlpha,
+                onInputChange = { chatViewModel.onEvent(ChatEvent.UpdateInput(it)) },
+                onSend = { chatViewModel.onEvent(ChatEvent.SendMessage(state.inputText)) },
+                onDismissError = { chatViewModel.onEvent(ChatEvent.DismissError) },
+                onRetry = { chatViewModel.onEvent(ChatEvent.RetryLastMessage) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .onGloballyPositioned { coords ->
+                        Live2dDelegate.getInstance().touchExclusionTopY = coords.boundsInWindow().top
+                    }
+            )
+        } else {
+            // ── Normal Mode: Classic full-screen MessageList + Bottom ChatInputBar ──
+            MessageList(
+                state = state,
+                listState = listState,
+                bubbleAlpha = bubbleAlpha,
+                glassmorphism = false,
+                onDismissError = { chatViewModel.onEvent(ChatEvent.DismissError) },
+                onRetry = { chatViewModel.onEvent(ChatEvent.RetryLastMessage) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 88.dp)
+                    .padding(horizontal = 4.dp, vertical = 8.dp)
+            )
 
-        // ── Layer 2: 顶部菜单与角色对话气泡 ──
+            ChatInputBar(
+                inputText = state.inputText,
+                onInputChange = { chatViewModel.onEvent(ChatEvent.UpdateInput(it)) },
+                onSend = { chatViewModel.onEvent(ChatEvent.SendMessage(state.inputText)) },
+                isLoading = state.isLoading,
+                glassmorphism = false,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+
+        // ── Layer 2: 顶部菜单与角色对话气泡 (Visual Novel style above character) ──
         AnimatedVisibility(
-            visible = state.characterBubble != null,
+            visible = activeCharacterBubble != null,
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut() + scaleOut(targetScale = 0.9f),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 56.dp, start = 20.dp, end = 64.dp)
+                .padding(top = if (isImmersive) 48.dp else 56.dp, start = 20.dp, end = 64.dp)
         ) {
-            state.characterBubble?.let { bubble ->
+            activeCharacterBubble?.let { bubble ->
                 CharacterDialogueBubble(
                     bubble = bubble,
-                    onDismiss = { chatViewModel.onEvent(ChatEvent.DismissCharacterBubble) }
+                    isImmersive = isImmersive,
+                    onDismiss = {
+                        if (state.characterBubble?.id == bubble.id) {
+                            chatViewModel.onEvent(ChatEvent.DismissCharacterBubble)
+                        }
+                        if (immersiveVnBubble?.id == bubble.id) {
+                            immersiveVnBubble = null
+                        }
+                    }
                 )
             }
         }
 
         OverlayMenu(
             onToggleOverlay = onToggleOverlay,
+            isImmersive = isImmersive,
+            onToggleImmersive = onToggleImmersiveMode,
             onClearConversation = {
                 // 立即清空，随后由撤销条给一次反悔机会（见 UndoSnackbarEffect）
                 chatViewModel.onEvent(ChatEvent.ClearConversation)
@@ -262,22 +415,13 @@ private fun ChatPage(
             modifier = Modifier.align(Alignment.TopEnd)
         )
 
-        // ── Layer 3: 底部输入栏 ──
-        ChatInputBar(
-            inputText = state.inputText,
-            onInputChange = { chatViewModel.onEvent(ChatEvent.UpdateInput(it)) },
-            onSend = { chatViewModel.onEvent(ChatEvent.SendMessage(state.inputText)) },
-            isLoading = state.isLoading,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-
         // ── Layer 4: Snackbar（提示 + 破坏性操作的二次确认） ──
         // 动作文案跟随主题 primary，见 AppSnackbarHost
         AppSnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 100.dp)
+                .padding(bottom = if (isImmersive) 108.dp else 100.dp)
         )
 
         // ── Layer 5: 记忆查看对话框 ──
@@ -297,14 +441,89 @@ private fun ChatPage(
     }
 }
 
+/**
+ * Floating translucent glassmorphism chat container anchored at the bottom of the screen
+ * in Fullscreen Immersive mode so messages remain readable without losing sight of the character.
+ */
+@Composable
+private fun ImmersiveBottomChatPanel(
+    state: ChatUiState,
+    listState: LazyListState,
+    bubbleAlpha: Float,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onDismissError: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val panelShape = RoundedCornerShape(24.dp)
+    val panelBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFF0B0E17).copy(alpha = 0.42f),
+            Color(0xFF0F1420).copy(alpha = 0.68f)
+        )
+    )
+    val hasHistoryContent = state.messages.isNotEmpty() || state.isLoading || state.error != null
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .widthIn(max = 520.dp)
+            .clip(panelShape)
+            .background(panelBrush)
+            .border(1.dp, Color.White.copy(alpha = 0.16f), panelShape)
+            .padding(top = 6.dp, bottom = 4.dp)
+    ) {
+        if (hasHistoryContent) {
+            MessageList(
+                state = state,
+                listState = listState,
+                bubbleAlpha = bubbleAlpha,
+                glassmorphism = true,
+                onDismissError = onDismissError,
+                onRetry = onRetry,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp, max = 216.dp)
+                    .padding(horizontal = 2.dp)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.chat_empty_hint).replace('\n', ' '),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.68f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        ChatInputBar(
+            inputText = state.inputText,
+            onInputChange = onInputChange,
+            onSend = onSend,
+            isLoading = state.isLoading,
+            glassmorphism = true
+        )
+    }
+}
+
 /** 消息列表：空态提示 + 消息气泡 + 加载中。 */
 @Composable
 private fun MessageList(
     state: ChatUiState,
     listState: LazyListState,
     bubbleAlpha: Float,
+    glassmorphism: Boolean,
     onDismissError: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // 兜底去重：消息列表出现重复 id 一定是上游 bug，但 LazyColumn 撞到重复 key 是
     // 直接抛 IllegalArgumentException 崩掉整个应用（不是渲染错乱），代价过高，
@@ -313,14 +532,11 @@ private fun MessageList(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 88.dp)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = if (glassmorphism) 4.dp else 8.dp),
         verticalArrangement = Arrangement.Bottom
     ) {
-        if (state.messages.isEmpty()) {
+        if (!glassmorphism && state.messages.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -341,7 +557,7 @@ private fun MessageList(
             items = uniqueMessages,
             key = { it.id }
         ) { message ->
-            ChatBubble(message = message, alpha = bubbleAlpha)
+            ChatBubble(message = message, alpha = bubbleAlpha, glassmorphism = glassmorphism)
         }
 
         if (state.isLoading) {
@@ -349,12 +565,16 @@ private fun MessageList(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(if (glassmorphism) 8.dp else 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = stringResource(R.string.chat_thinking),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = if (glassmorphism) {
+                            Color.White.copy(alpha = 0.78f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        }
                     )
                 }
             }
@@ -514,20 +734,30 @@ private fun MemoryDialog(
     }
 }
 
-/** Speech bubble displayed directly above the Live2D character (e.g. incoming Telegram message). */
+/** Speech bubble displayed directly above the Live2D character (visual-novel style). */
 @Composable
 private fun CharacterDialogueBubble(
     bubble: CharacterBubbleUi,
+    isImmersive: Boolean = false,
     onDismiss: () -> Unit
 ) {
-    val containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+    val containerColor = if (isImmersive) {
+        Color(0xFF131826).copy(alpha = 0.84f)
+    } else {
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+    }
+    val textColor = if (isImmersive) Color.White else MaterialTheme.colorScheme.onSurface
+    val dismissTint = if (isImmersive) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val borderStroke = if (isImmersive) BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)) else null
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(
-            modifier = Modifier.widthIn(min = 160.dp, max = 300.dp),
+            modifier = Modifier.widthIn(min = 160.dp, max = 310.dp),
             shape = RoundedCornerShape(18.dp),
             color = containerColor,
-            tonalElevation = 6.dp,
-            shadowElevation = 6.dp
+            border = borderStroke,
+            tonalElevation = if (isImmersive) 0.dp else 6.dp,
+            shadowElevation = if (isImmersive) 8.dp else 6.dp
         ) {
             Column(modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -550,7 +780,7 @@ private fun CharacterDialogueBubble(
                         Icon(
                             painter = painterResource(R.drawable.ic_close),
                             contentDescription = stringResource(R.string.chat_dialogue_dismiss),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = dismissTint,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -558,7 +788,9 @@ private fun CharacterDialogueBubble(
                 Text(
                     text = bubble.text,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = textColor,
+                    maxLines = if (isImmersive) 4 else Int.MAX_VALUE,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }

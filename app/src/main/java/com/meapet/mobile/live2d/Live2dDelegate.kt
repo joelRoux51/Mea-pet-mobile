@@ -92,6 +92,14 @@ class Live2dDelegate private constructor() {
     @Volatile
     var zoneTouchEnabled = true
 
+    /** Fullscreen Immersive mode: pure black background, no wallpaper, full-height character. */
+    @Volatile
+    var immersiveMode = false
+
+    /** Window Y pixel threshold below which taps belong to the floating chat UI (ignored for character taps). */
+    @Volatile
+    var touchExclusionTopY: Float = Float.MAX_VALUE
+
     /** 背景色 RGBA（0~1），跟随主题变化。默认浅色。
      *  Kotlin 的 @Volatile 只作用于单个属性，四个通道需各自标注。 */
     @Volatile
@@ -202,16 +210,23 @@ class Live2dDelegate private constructor() {
 
         Live2dPal.updateTime()
 
-        GLES20.glClearColor(bgR, bgG, bgB, bgA)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        GLES20.glClearDepthf(1.0f)
+        val isImmersive = immersiveMode
+        if (isImmersive) {
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+            GLES20.glClearDepthf(1.0f)
+        } else {
+            GLES20.glClearColor(bgR, bgG, bgB, bgA)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+            GLES20.glClearDepthf(1.0f)
 
-        // ── 背景壁纸层：清屏（纯色兜底）之后、Live2D 模型绘制之前 ──
-        // 无壁纸时 onFrame 是 no-op，清屏纯色照旧。悬浮窗走独立渲染器，不受影响。
-        try {
-            wallpaper.onFrame(windowWidth, windowHeight)
-        } catch (e: Exception) {
-            Log.e(TAG, "Wallpaper render error: ${e.message}")
+            // ── 背景壁纸层：清屏（纯色兜底）之后、Live2D 模型绘制之前 ──
+            // 无壁纸时 onFrame 是 no-op，清屏纯色照旧。悬浮窗走独立渲染器，不受影响。
+            try {
+                wallpaper.onFrame(windowWidth, windowHeight)
+            } catch (e: Exception) {
+                Log.e(TAG, "Wallpaper render error: ${e.message}")
+            }
         }
 
         try {
@@ -294,17 +309,33 @@ class Live2dDelegate private constructor() {
      */
     private fun detectZone(x: Float, y: Float): Pair<TouchReactionHelper.TapReaction, String>? {
         if (windowWidth <= 0 || windowHeight <= 0) return null
+        val isImmersive = immersiveMode
+        if (isImmersive && y >= touchExclusionTopY) return null
+
         val nx = (x / windowWidth) * 2f - 1f
         val ny = -((y / windowHeight) * 2f - 1f)
 
         val isAlita = Live2dManager.getInstance().activeSpec.renderType == AvatarRenderType.SPRITE_2D
-        if (isAlita) {
-            if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
+        if (isImmersive) {
+            if (isAlita) {
+                if (nx < -0.92f || nx > 0.92f || ny < -0.96f || ny > 0.96f) return null
+            } else {
+                if (nx < -0.78f || nx > 0.78f || ny < -0.92f || ny > 0.92f) return null
+            }
         } else {
-            if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
+            if (isAlita) {
+                if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
+            } else {
+                if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
+            }
         }
 
-        val splitY = if (isAlita) 0.18f else 0.00f
+        val splitY = when {
+            isImmersive && isAlita -> 0.22f
+            isImmersive -> 0.05f
+            isAlita -> 0.18f
+            else -> 0.00f
+        }
         val dir = if (ny > splitY) {
             VOICE_DIR_UPPER
         } else if (nx < 0f) {

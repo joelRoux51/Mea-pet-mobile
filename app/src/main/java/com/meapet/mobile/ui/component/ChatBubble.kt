@@ -1,6 +1,7 @@
 package com.meapet.mobile.ui.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,17 +62,19 @@ private fun bubbleMaxWidth(): Dp =
  * @param message 消息
  * @param modifier Modifier
  * @param alpha 气泡整体透明度（0.2~1.0，1.0 不透明），主页聊天列表可调
+ * @param glassmorphism 沉浸模式下的半透明毛玻璃气泡外观
  */
 @Composable
 fun ChatBubble(
     message: ChatMessage,
     modifier: Modifier = Modifier,
-    alpha: Float = 1f
+    alpha: Float = 1f,
+    glassmorphism: Boolean = false
 ) {
     when (message.role) {
-        ChatRole.user -> UserBubble(message, modifier, alpha)
-        ChatRole.assistant -> AssistantBubble(message, modifier, alpha)
-        ChatRole.system -> SystemBanner(message, modifier, alpha)
+        ChatRole.user -> UserBubble(message, modifier, alpha, glassmorphism)
+        ChatRole.assistant -> AssistantBubble(message, modifier, alpha, glassmorphism)
+        ChatRole.system -> SystemBanner(message, modifier, alpha, glassmorphism)
     }
 }
 
@@ -78,8 +82,12 @@ fun ChatBubble(
 private fun UserBubble(
     message: ChatMessage,
     modifier: Modifier,
-    alpha: Float
+    alpha: Float,
+    glassmorphism: Boolean
 ) {
+    val bgAlpha = if (glassmorphism) (alpha * 0.80f).coerceIn(0.32f, 0.88f) else alpha
+    val textAlpha = if (glassmorphism) 0.98f else alpha
+    val shape = RoundedCornerShape(16.dp, 4.dp, 16.dp, 16.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -89,8 +97,15 @@ private fun UserBubble(
         Box(
             modifier = Modifier
                 .widthIn(max = bubbleMaxWidth())
-                .clip(RoundedCornerShape(16.dp, 4.dp, 16.dp, 16.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = bgAlpha))
+                .then(
+                    if (glassmorphism) {
+                        Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), shape)
+                    } else {
+                        Modifier
+                    }
+                )
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             // 长按弹出系统文字选择菜单（复制 / 全选）。SelectionContainer 只接管
@@ -98,7 +113,7 @@ private fun UserBubble(
             SelectionContainer {
                 Text(
                     text = message.content,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = alpha),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = textAlpha),
                     style = MaterialTheme.typography.bodyMedium,
                     lineHeight = 22.sp
                 )
@@ -111,8 +126,19 @@ private fun UserBubble(
 private fun AssistantBubble(
     message: ChatMessage,
     modifier: Modifier,
-    alpha: Float
+    alpha: Float,
+    glassmorphism: Boolean
 ) {
+    val bgAlpha = if (glassmorphism) (alpha * 0.76f).coerceIn(0.34f, 0.86f) else alpha
+    val bgColor = if (glassmorphism) {
+        Color(0xFF171C2A).copy(alpha = bgAlpha)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = bgAlpha)
+    }
+    val textColor = if (glassmorphism) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val textAlpha = if (glassmorphism) 0.96f else alpha
+    val shape = RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -125,15 +151,22 @@ private fun AssistantBubble(
                     text = stringResource(R.string.chat_telegram_badge),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = textAlpha),
                     modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                 )
             }
             Box(
                 modifier = Modifier
                     .widthIn(max = bubbleMaxWidth())
-                    .clip(RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha))
+                    .clip(shape)
+                    .background(bgColor)
+                    .then(
+                        if (glassmorphism) {
+                            Modifier.border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+                        } else {
+                            Modifier
+                        }
+                    )
                     // 左右内边距交给 MarkdownText 施加：横向滚动的表格要能一路滑到气泡
                     // 边缘，若内边距加在这里，表格会在内边距那一段就被裁掉、看起来像被
                     // 气泡边缘遮住一截
@@ -143,8 +176,8 @@ private fun AssistantBubble(
                 // TextView 已开启原生文字选择：长按弹出复制/全选菜单，与链接点击并存。
                 MarkdownText(
                     markdown = message.content,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    alpha = alpha,
+                    color = textColor,
+                    alpha = textAlpha,
                     isStreaming = message.isStreaming,
                     // 扣掉左右内边距后的正文宽度，供宽表格判断是否需要横向滚动
                     availableWidth = bubbleMaxWidth() - BUBBLE_HORIZONTAL_PADDING * 2,
@@ -158,7 +191,7 @@ private fun AssistantBubble(
                 Text(
                     text = stringResource(R.string.chat_streaming_typing),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f * alpha),
+                    color = textColor.copy(alpha = 0.55f * textAlpha),
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -170,8 +203,21 @@ private fun AssistantBubble(
 private fun SystemBanner(
     message: ChatMessage,
     modifier: Modifier,
-    alpha: Float
+    alpha: Float,
+    glassmorphism: Boolean
 ) {
+    val bgColor = if (glassmorphism) {
+        Color(0xFF1E2638).copy(alpha = (alpha * 0.72f).coerceIn(0.30f, 0.80f))
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f * alpha)
+    }
+    val textColor = if (glassmorphism) {
+        Color.White.copy(alpha = 0.92f)
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = alpha)
+    }
+    val shape = RoundedCornerShape(12.dp)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -180,14 +226,21 @@ private fun SystemBanner(
     ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f * alpha))
+                .clip(shape)
+                .background(bgColor)
+                .then(
+                    if (glassmorphism) {
+                        Modifier.border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+                    } else {
+                        Modifier
+                    }
+                )
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
             Text(
                 text = message.content,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = alpha)
+                color = textColor
             )
         }
     }

@@ -42,6 +42,7 @@ import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dRenderState
 import com.meapet.mobile.live2d.Live2dRenderer
 import com.meapet.mobile.live2d.overlay.FloatingLive2dService
+import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.ui.component.AutoUpdateOptInDialog
 import com.meapet.mobile.ui.component.PRIVACY_POLICY_VERSION
 import com.meapet.mobile.ui.screen.ChatScreenContent
@@ -129,12 +130,19 @@ class MainActivity : ComponentActivity() {
         // themeModeFlow 订阅修正——onCreate 无法挂起，这个极短窗口只能接受。
         try {
             val themeMode = container.settingsManager.getThemeMode()
+            val isImmersiveInit = container.settingsManager.getDisplayMode() == SettingsKeys.DISPLAY_MODE_IMMERSIVE
             val isDark = isDarkTheme(this, themeMode)
             val bg = if (isDark) intArrayOf(0x14, 0x14, 0x14) else intArrayOf(0xF7, 0xF7, 0xF7)
             Live2dDelegate.getInstance().let { d ->
+                d.immersiveMode = isImmersiveInit
                 d.bgR = bg[0] / 255f; d.bgG = bg[1] / 255f; d.bgB = bg[2] / 255f; d.bgA = 1.0f
             }
-            window.setBackgroundDrawable(ColorDrawable(0xFF000000.toInt() or (bg[0] shl 16) or (bg[1] shl 8) or bg[2]))
+            val initWinBg = if (isImmersiveInit) {
+                0xFF000000.toInt()
+            } else {
+                0xFF000000.toInt() or (bg[0] shl 16) or (bg[1] shl 8) or bg[2]
+            }
+            window.setBackgroundDrawable(ColorDrawable(initWinBg))
         } catch (e: Exception) {
             window.setBackgroundDrawable(ColorDrawable(0xFFF7F7F7.toInt()))
         }
@@ -170,25 +178,30 @@ class MainActivity : ComponentActivity() {
                 val colorPreset by container.settingsManager.colorPresetFlow
                     .collectAsState(initial = "default")
 
+                val displayMode by container.settingsManager.displayModeFlow
+                    .collectAsState(initial = container.settingsManager.getDisplayMode())
+                val isImmersive = displayMode == SettingsKeys.DISPLAY_MODE_IMMERSIVE
+
                 // Live2D 背景色跟随主题（onCreate 已同步预置首帧主题色，此处响应后续切换）
                 val bgColor = remember(themeMode) {
                     val isDark = isDarkTheme(this@MainActivity, themeMode)
                     if (isDark) floatArrayOf(0.08f, 0.08f, 0.08f)
                     else floatArrayOf(0.97f, 0.97f, 0.97f)
                 }
-                LaunchedEffect(bgColor) {
+                LaunchedEffect(isImmersive, bgColor) {
                     Live2dDelegate.getInstance().let { d ->
+                        d.immersiveMode = isImmersive
                         d.bgR = bgColor[0]; d.bgG = bgColor[1]; d.bgB = bgColor[2]; d.bgA = 1.0f
                     }
-                    // 窗口背景同步跟随主题：onCreate 那一刻设的是当时的（若快照未就绪则可能是
-                    // 默认）底色；之后切换主题或 Activity 重建，GL Surface 短暂不可见时露出来的
-                    // 窗口底色不会再停留在旧主题上。
-                    val r = (bgColor[0] * 255).toInt()
-                    val g = (bgColor[1] * 255).toInt()
-                    val b = (bgColor[2] * 255).toInt()
-                    window.setBackgroundDrawable(
-                        ColorDrawable(0xFF000000.toInt() or (r shl 16) or (g shl 8) or b)
-                    )
+                    val winColor = if (isImmersive) {
+                        0xFF000000.toInt()
+                    } else {
+                        val r = (bgColor[0] * 255).toInt()
+                        val g = (bgColor[1] * 255).toInt()
+                        val b = (bgColor[2] * 255).toInt()
+                        0xFF000000.toInt() or (r shl 16) or (g shl 8) or b
+                    }
+                    window.setBackgroundDrawable(ColorDrawable(winColor))
                 }
 
                 // 背景壁纸：设置变化实时同步到 GL（GL 线程每帧读，下帧即生效）
@@ -284,7 +297,18 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-                    ChatScreenContent(onToggleOverlay = { toggleOverlay() })
+                    ChatScreenContent(
+                        displayMode = displayMode,
+                        onToggleImmersiveMode = {
+                            val next = if (isImmersive) {
+                                SettingsKeys.DISPLAY_MODE_NORMAL
+                            } else {
+                                SettingsKeys.DISPLAY_MODE_IMMERSIVE
+                            }
+                            scope.launch { settingsManager.setDisplayMode(next) }
+                        },
+                        onToggleOverlay = { toggleOverlay() }
+                    )
                 }
             }
         }

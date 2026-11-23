@@ -216,7 +216,8 @@ class Live2dManager private constructor() {
                 dragX = dragX,
                 dragY = dragY,
                 opacity = 1f,
-                isOverlay = false
+                isOverlay = false,
+                isImmersive = delegate.immersiveMode
             )
             return
         }
@@ -234,7 +235,12 @@ class Live2dManager private constructor() {
         val mm = m.modelMatrix ?: return
         val canvasRatio = core.canvasHeight / core.canvasWidth
 
-        if (canvasRatio < displayRatio) {
+        if (delegate.immersiveMode) {
+            mm.setHeight(2.05f)
+            mm.centerX(0.0f)
+            mm.centerY(0.0f)
+            projection.scale(1.0f / aspect, 1.0f)
+        } else if (canvasRatio < displayRatio) {
             mm.setWidth(2.4f)
             projection.scale(1.0f, aspect)
         } else {

@@ -41,6 +41,8 @@
     <string name="menu_clear_conversation">Effacer la discussion</string>
     <string name="menu_view_memories">Voir les souvenirs</string>
     <string name="menu_overlay">Fenêtre flottante</string>
+    <string name="menu_immersive_mode">Plein écran Immersif</string>
+    <string name="menu_normal_mode">Mode Normal</string>
     <string name="tts_unmute_session">Activer la voix pour cette session</string>
     <string name="tts_mute_session">Couper la voix pour cette session</string>
 
@@ -145,6 +147,15 @@
     <string name="wallpaper_pick_gallery">Choisir depuis la galerie</string>
     <string name="wallpaper_blur_label">Flou d\'arrière-plan : %1$d%%</string>
     <string name="chat_bubble_alpha_label">Opacité des bulles : %1$d%%</string>
+    <string name="display_mode_section_title">Mode d\'affichage</string>
+    <string name="display_mode_section_desc">Choisissez comment le personnage et le chat s\'affichent à l\'écran</string>
+    <string name="display_mode_normal_title">Normal</string>
+    <string name="display_mode_normal_desc">Personnage en haut, discussion classique en bas</string>
+    <string name="display_mode_immersive_title">Plein écran Immersif</string>
+    <string name="display_mode_immersive_desc">Personnage 100% hauteur sur fond noir pur et chat translucide flottant</string>
+    <string name="display_mode_floating_title">Fenêtre flottante</string>
+    <string name="display_mode_floating_desc">Afficher le personnage par-dessus les autres applications</string>
+
     <string name="theme_section_title">Thème</string>
     <string name="theme_mode_label">Mode d\'affichage</string>
     <string name="theme_mode_system">Suivre le système</string>

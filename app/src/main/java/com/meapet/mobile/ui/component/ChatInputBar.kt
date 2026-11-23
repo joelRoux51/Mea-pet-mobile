@@ -1,5 +1,6 @@
 package com.meapet.mobile.ui.component
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,6 +41,7 @@ import com.meapet.mobile.R
  * @param isLoading 是否正在等待响应
  * @param placeholder 占位文本
  * @param enabled 是否可交互
+ * @param glassmorphism 是否使用沉浸模式半透明毛玻璃外观
  * @param modifier Modifier
  */
 @Composable
@@ -49,28 +52,51 @@ fun ChatInputBar(
     isLoading: Boolean = false,
     placeholder: String = stringResource(R.string.chat_input_placeholder),
     enabled: Boolean = true,
+    glassmorphism: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val containerColor = if (glassmorphism) {
+        Color(0xFF141926).copy(alpha = 0.72f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+    }
+    val textColor = if (glassmorphism) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val borderStroke = if (glassmorphism) {
+        BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
+    } else {
+        null
+    }
+    val outerPadding = if (glassmorphism) {
+        Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+    } else {
+        Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+    }
+    val fieldVerticalPadding = if (glassmorphism) 14.dp else 20.dp
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .then(outerPadding),
         shape = RoundedCornerShape(28.dp),
-        tonalElevation = 8.dp,
+        tonalElevation = if (glassmorphism) 0.dp else 8.dp,
         // 保持 0：投影会渗过半透明填充，在浅色模式下形成一条亮带
         shadowElevation = 0.dp,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+        border = borderStroke,
+        color = containerColor
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                .padding(start = 18.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // 用 BasicTextField 而非 M3 TextField：后者的装饰盒会画自己的容器和指示线，
             // 容器色按 focused/unfocused/disabled/error 分档，漏一档就在半透明药丸上露底。
-            // 垂直内边距 20dp 使 Row 高度与原先 TextField 的 56dp 最小高度相当。
             BasicTextField(
                 value = inputText,
                 onValueChange = { if (!isLoading) onInputChange(it) },
@@ -78,26 +104,21 @@ fun ChatInputBar(
                 enabled = enabled,
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    }
+                    color = if (enabled) textColor else textColor.copy(alpha = 0.5f)
                 ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
+                cursorBrush = SolidColor(textColor),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { if (!isLoading) onSend() }),
                 decorationBox = { innerTextField ->
                     Box(
-                        modifier = Modifier.padding(vertical = 20.dp),
+                        modifier = Modifier.padding(vertical = fieldVerticalPadding),
                         contentAlignment = Alignment.CenterStart
                     ) {
                         if (inputText.isEmpty()) {
                             Text(
                                 text = placeholder,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    .copy(alpha = 0.6f)
+                                color = textColor.copy(alpha = 0.62f)
                             )
                         }
                         innerTextField()

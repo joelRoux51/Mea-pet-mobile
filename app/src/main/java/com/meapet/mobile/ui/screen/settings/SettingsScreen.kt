@@ -51,6 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meapet.mobile.R
+import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.ui.component.AppSnackbarHost
 import com.meapet.mobile.ui.component.UndoSnackbarEffect
 import com.meapet.mobile.ui.component.PrivacyPolicyContent
@@ -87,6 +88,7 @@ private enum class SettingsPage(@StringRes val titleRes: Int) {
 fun SettingsScreen(
     onBack: () -> Unit,
     onExitApp: () -> Unit = {},
+    onToggleOverlay: () -> Unit = {},
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val state by settingsViewModel.state.collectAsState()
@@ -200,6 +202,13 @@ fun SettingsScreen(
                     }
 
                     SettingsPage.APPEARANCE -> {
+                        SettingsCard {
+                            DisplayModeSection(
+                                state = state,
+                                viewModel = settingsViewModel,
+                                onLaunchFloatingWindow = onToggleOverlay
+                            )
+                        }
                         SettingsCard {
                             LanguageSection(state = state, viewModel = settingsViewModel)
                         }
@@ -352,10 +361,15 @@ private fun SettingsEntryRow(
     )
 }
 
-/** 外观入口摘要：主题模式 + 配色来源。 */
+/** 外观入口摘要：显示模式 + 主题模式 + 配色来源。 */
 @SuppressLint("ComposableNaming")
 @Composable
 private fun appearanceSummary(state: SettingsUiState): String {
+    val display = if (state.displayMode == SettingsKeys.DISPLAY_MODE_IMMERSIVE) {
+        stringResource(R.string.display_mode_immersive_title)
+    } else {
+        stringResource(R.string.display_mode_normal_title)
+    }
     val mode = when (state.themeMode) {
         "light" -> stringResource(R.string.theme_mode_light)
         "dark" -> stringResource(R.string.theme_mode_dark)
@@ -366,5 +380,5 @@ private fun appearanceSummary(state: SettingsUiState): String {
     } else {
         stringResource(findPreset(state.colorPreset).nameRes)
     }
-    return "$mode · $color"
+    return "$display · $mode · $color"
 }

@@ -55,6 +55,8 @@ fun OverlayMenu(
     onClearConversation: () -> Unit = {},
     onShowMemories: () -> Unit = {},
     onToggleOverlay: () -> Unit = {},
+    isImmersive: Boolean = false,
+    onToggleImmersive: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -134,6 +136,17 @@ fun OverlayMenu(
                             MenuEntry(stringResource(R.string.menu_clear_conversation), R.drawable.ic_menu_clear) { menuExpanded = false; onClearConversation() }
                             HorizontalDivider()
                             MenuEntry(stringResource(R.string.menu_view_memories), R.drawable.ic_menu_memory) { menuExpanded = false; onShowMemories() }
+                            HorizontalDivider()
+                            MenuEntry(
+                                label = stringResource(
+                                    if (isImmersive) R.string.menu_normal_mode
+                                    else R.string.menu_immersive_mode
+                                ),
+                                iconRes = R.drawable.ic_settings_appearance
+                            ) {
+                                menuExpanded = false
+                                onToggleImmersive()
+                            }
                             HorizontalDivider()
                             MenuEntry(stringResource(R.string.menu_overlay), R.drawable.ic_menu_overlay) { menuExpanded = false; onToggleOverlay() }
                         }

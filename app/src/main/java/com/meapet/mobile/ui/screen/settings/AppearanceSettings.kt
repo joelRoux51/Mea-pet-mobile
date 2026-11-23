@@ -75,6 +75,7 @@ import com.meapet.mobile.R
 import com.meapet.mobile.core.LocaleHelper
 import com.meapet.mobile.live2d.AvatarRenderType
 import com.meapet.mobile.live2d.Live2dModelStore
+import com.meapet.mobile.settings.SettingsKeys
 import com.meapet.mobile.ui.theme.THEME_PRESETS
 import com.meapet.mobile.viewmodel.SettingsUiState
 import com.meapet.mobile.viewmodel.SettingsViewModel
@@ -82,8 +83,104 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // ═══════════════════════════════════════════════════
-//  外观：语言、Live2D 模型、背景壁纸、气泡透明度与主题
+//  外观：显示模式、语言、Live2D 模型、背景壁纸、气泡透明度与主题
 // ═══════════════════════════════════════════════════
+
+@Composable
+internal fun DisplayModeSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    onLaunchFloatingWindow: () -> Unit
+) {
+    SectionTitle(stringResource(R.string.display_mode_section_title))
+    Text(
+        text = stringResource(R.string.display_mode_section_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT),
+        modifier = Modifier.padding(bottom = 10.dp)
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DisplayModeOptionCard(
+            title = stringResource(R.string.display_mode_normal_title),
+            description = stringResource(R.string.display_mode_normal_desc),
+            selected = state.displayMode != SettingsKeys.DISPLAY_MODE_IMMERSIVE,
+            onClick = { viewModel.updateDisplayMode(SettingsKeys.DISPLAY_MODE_NORMAL) }
+        )
+        DisplayModeOptionCard(
+            title = stringResource(R.string.display_mode_immersive_title),
+            description = stringResource(R.string.display_mode_immersive_desc),
+            selected = state.displayMode == SettingsKeys.DISPLAY_MODE_IMMERSIVE,
+            onClick = { viewModel.updateDisplayMode(SettingsKeys.DISPLAY_MODE_IMMERSIVE) }
+        )
+        DisplayModeOptionCard(
+            title = stringResource(R.string.display_mode_floating_title),
+            description = stringResource(R.string.display_mode_floating_desc),
+            selected = false,
+            onClick = onLaunchFloatingWindow
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+}
+
+@Composable
+private fun DisplayModeOptionCard(
+    title: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ALPHA_CARD_BG_MID)
+        },
+        shape = RoundedCornerShape(12.dp),
+        border = if (selected) {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ALPHA_MUTED_TEXT)
+                    }
+                )
+            }
+            if (selected) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = stringResource(R.string.action_selected),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

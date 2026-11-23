@@ -93,6 +93,7 @@ class SettingsManager(context: Context) {
     private val KEY_APP_LANGUAGE = stringPreferencesKey(SettingsKeys.APP_LANGUAGE)
     private val KEY_ACTIVE_LIVE2D_MODEL = stringPreferencesKey(SettingsKeys.ACTIVE_LIVE2D_MODEL)
     private val KEY_TELEGRAM_ENABLED = booleanPreferencesKey(SettingsKeys.TELEGRAM_ENABLED)
+    private val KEY_DISPLAY_MODE = stringPreferencesKey(SettingsKeys.DISPLAY_MODE)
 
     // ── Flows (响应式订阅) ────────────────────────────
 
@@ -213,6 +214,10 @@ class SettingsManager(context: Context) {
         prefs[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
     }
 
+    val displayModeFlow: Flow<String> = dataStore.data.map { prefs ->
+        prefs[KEY_DISPLAY_MODE] ?: SettingsKeys.Defaults.DISPLAY_MODE
+    }
+
     // ── 同步 getter（非 Flow 场景使用，如 Client 构造）──
     // 读取内存快照，全程无磁盘 IO；快照未就绪时返回空快照，各 getter 落到 Defaults，
     // 绝不在主线程阻塞读盘（首帧真实值由对应 Flow 就绪后修正）
@@ -284,6 +289,7 @@ class SettingsManager(context: Context) {
     fun getAppLanguage(): String = currentPrefs()[KEY_APP_LANGUAGE] ?: SettingsKeys.Defaults.APP_LANGUAGE
     fun getActiveLive2dModel(): String = currentPrefs()[KEY_ACTIVE_LIVE2D_MODEL] ?: SettingsKeys.Defaults.ACTIVE_LIVE2D_MODEL
     fun isTelegramEnabled(): Boolean = currentPrefs()[KEY_TELEGRAM_ENABLED] ?: SettingsKeys.Defaults.TELEGRAM_ENABLED
+    fun getDisplayMode(): String = currentPrefs()[KEY_DISPLAY_MODE] ?: SettingsKeys.Defaults.DISPLAY_MODE
 
     // ── 写入方法 ──────────────────────────────────────
     // edit 返回写入后的最新快照，随手更新缓存，保证同步 getter 读己之写
@@ -390,6 +396,10 @@ class SettingsManager(context: Context) {
 
     suspend fun setTelegramEnabled(enabled: Boolean) {
         cachedPrefs = dataStore.edit { prefs -> prefs[KEY_TELEGRAM_ENABLED] = enabled }
+    }
+
+    suspend fun setDisplayMode(mode: String) {
+        cachedPrefs = dataStore.edit { prefs -> prefs[KEY_DISPLAY_MODE] = mode }
     }
 
     /** 清除所有设置（恢复出厂）。 */

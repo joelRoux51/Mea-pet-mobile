@@ -41,6 +41,8 @@
     <string name="menu_clear_conversation">Borrar chat</string>
     <string name="menu_view_memories">Ver recuerdos</string>
     <string name="menu_overlay">Ventana flotante</string>
+    <string name="menu_immersive_mode">Pantalla completa inmersiva</string>
+    <string name="menu_normal_mode">Modo Normal</string>
     <string name="tts_unmute_session">Activar voz en esta sesión</string>
     <string name="tts_mute_session">Silenciar voz en esta sesión</string>
 
@@ -145,6 +147,15 @@
     <string name="wallpaper_pick_gallery">Elegir de la galería</string>
     <string name="wallpaper_blur_label">Desenfoque del fondo: %1$d%%</string>
     <string name="chat_bubble_alpha_label">Opacidad de burbujas: %1$d%%</string>
+    <string name="display_mode_section_title">Modo de visualización</string>
+    <string name="display_mode_section_desc">Elige cómo se muestran el personaje y el chat en pantalla</string>
+    <string name="display_mode_normal_title">Normal</string>
+    <string name="display_mode_normal_desc">Personaje arriba, historial de chat clásico abajo</string>
+    <string name="display_mode_immersive_title">Pantalla completa inmersiva</string>
+    <string name="display_mode_immersive_desc">Personaje al 100% sobre fondo negro puro con chat translúcido flotante</string>
+    <string name="display_mode_floating_title">Ventana flotante</string>
+    <string name="display_mode_floating_desc">Mostrar el personaje encima de otras aplicaciones</string>
+
     <string name="theme_section_title">Tema</string>
     <string name="theme_mode_label">Modo de tema</string>
     <string name="theme_mode_system">Según el sistema</string>

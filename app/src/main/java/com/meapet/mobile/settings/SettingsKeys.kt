@@ -62,6 +62,11 @@ object SettingsKeys {
     // ── Local Webhook ─────────────────────────────────
     const val TELEGRAM_ENABLED = "telegram_enabled"
 
+    // ── Mode d'affichage ──────────────────────────────
+    const val DISPLAY_MODE = "display_mode" // "normal" | "immersive"
+    const val DISPLAY_MODE_NORMAL = "normal"
+    const val DISPLAY_MODE_IMMERSIVE = "immersive"
+
     /** 合理的默认值。 */
     object Defaults {
         const val API_URL = "https://api.deepseek.com/v1"
@@ -102,5 +107,8 @@ object SettingsKeys {
 
         // Local Webhook
         const val TELEGRAM_ENABLED = false
+
+        // Mode d'affichage
+        const val DISPLAY_MODE = DISPLAY_MODE_NORMAL
     }
 }

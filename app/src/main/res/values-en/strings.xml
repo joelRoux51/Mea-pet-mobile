@@ -41,6 +41,8 @@
     <string name="menu_clear_conversation">Clear chat</string>
     <string name="menu_view_memories">View memories</string>
     <string name="menu_overlay">Floating window</string>
+    <string name="menu_immersive_mode">Fullscreen Immersive</string>
+    <string name="menu_normal_mode">Normal mode</string>
     <string name="tts_unmute_session">Unmute voice for this session</string>
     <string name="tts_mute_session">Mute voice for this session</string>
 
@@ -145,6 +147,15 @@
     <string name="wallpaper_pick_gallery">Choose from gallery</string>
     <string name="wallpaper_blur_label">Background blur: %1$d%%</string>
     <string name="chat_bubble_alpha_label">Chat bubble opacity: %1$d%%</string>
+    <string name="display_mode_section_title">Display Mode</string>
+    <string name="display_mode_section_desc">Choose how the character and chat appear on screen</string>
+    <string name="display_mode_normal_title">Normal</string>
+    <string name="display_mode_normal_desc">Character at the top, classic chat stream below</string>
+    <string name="display_mode_immersive_title">Fullscreen Immersive</string>
+    <string name="display_mode_immersive_desc">Full-height character on pure black with floating glass chat</string>
+    <string name="display_mode_floating_title">Floating window</string>
+    <string name="display_mode_floating_desc">Overlay the character on top of other apps</string>
+
     <string name="theme_section_title">Theme</string>
     <string name="theme_mode_label">Theme mode</string>
     <string name="theme_mode_system">Follow system</string>

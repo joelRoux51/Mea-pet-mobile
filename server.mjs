@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 const ASSETS_ROOT = path.join(__dirname, 'public', 'assets', 'alita_live2d');
 
@@ -19,11 +19,11 @@ const MIME_TYPES = {
 };
 
 const POSES = [
-  { id: 'normal', label: 'Normal', tag: '[EMOTION: normal]', desc: 'Neutre, bras le long du corps' },
-  { id: 'joie', label: 'Joie', tag: '[EMOTION: joie]', desc: 'Sourire radieux, salut amical' },
+  { id: 'normal', label: 'Normal', tag: '[EMOTION: normal]', desc: 'Neutre, attitude calme' },
+  { id: 'joie', label: 'Joie / Coucou', tag: '[EMOTION: joie]', desc: 'Sourire radieux, salut amical' },
   { id: 'serieux', label: 'Sérieux', tag: '[EMOTION: serieux]', desc: 'Bras croisés, regard perçant' },
   { id: 'colere', label: 'Colère', tag: '[EMOTION: colere]', desc: 'Sourcils froncés, protestation' },
-  { id: 'calme', label: 'Calme', tag: '[EMOTION: calme]', desc: 'Mains jointes, yeux fermés' },
+  { id: 'calme', label: 'Calme / Prière', tag: '[EMOTION: calme]', desc: 'Mains jointes, yeux fermés' },
   { id: 'fatigue', label: 'Fatigue', tag: '[EMOTION: fatigue]', desc: 'Bâillement, yeux mi-clos' },
 ];
 
@@ -41,6 +41,8 @@ const LAYER_FILES = [
   'bouche.png',
   'bouche_joie.png',
   'bouche_colere.png',
+  'bouche_malice.png',
+  'bouche_surprise.png',
   'bras_main_gauche.png',
   'bras_main_droit.png',
   'torse.png',
@@ -250,7 +252,7 @@ function renderIndexHtml() {
         <p class="subtitle">Aperçu interactif des 6 émotions pour le webhook MeaPet (application Android native Kotlin/Gradle)</p>
       </div>
       <a class="primary-download" href="/assets/alita_live2d/alita_live2d_layers.psd" download="alita_live2d_layers.psd">
-        Télécharger le PSD (21 calques)
+        Télécharger le PSD (23 calques)
       </a>
     </header>
 
@@ -260,7 +262,7 @@ function renderIndexHtml() {
           <img id="preview-img" src="/assets/alita_live2d/sprites/alita_normal.png" alt="Alita Normal" />
         </div>
         <div class="stage-caption" id="preview-caption">
-          <strong>Normal</strong> — Neutre, bras le long du corps (<code>[EMOTION: normal]</code>)
+          <strong>Normal</strong> — Neutre, attitude calme (<code>[EMOTION: normal]</code>)
         </div>
       </div>
 
@@ -271,7 +273,7 @@ function renderIndexHtml() {
         <h2>Télécharger les 6 sprites PNG transparents</h2>
         <div class="chips">${spriteLinks}</div>
 
-        <h2>Télécharger les 21 calques PNG séparés</h2>
+        <h2>Télécharger les 23 calques PNG séparés</h2>
         <div class="chips">${layerLinks}</div>
 
         <p class="note">

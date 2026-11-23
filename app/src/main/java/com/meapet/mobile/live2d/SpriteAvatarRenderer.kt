@@ -144,13 +144,14 @@ class SpriteAvatarRenderer {
         dragX: Float = 0f,
         dragY: Float = 0f,
         opacity: Float = 1f,
-        isOverlay: Boolean = false
+        isOverlay: Boolean = false,
+        isImmersive: Boolean = false
     ) {
         if (!loaded || viewWidth <= 0 || viewHeight <= 0) return
         val baseTex = textures[currentEmotion] ?: textures[Live2dEmotion.EMOTION_NORMAL] ?: return
 
         if (shader3d == null || !shader3d.isValid) {
-            drawFlatFallback(viewWidth, viewHeight, shaderProgramId, baseTex, dragX, dragY, opacity, isOverlay)
+            drawFlatFallback(viewWidth, viewHeight, shaderProgramId, baseTex, dragX, dragY, opacity, isOverlay, isImmersive)
             return
         }
 
@@ -228,13 +229,12 @@ class SpriteAvatarRenderer {
             0f
         }
 
-        // Camera & snug perspective fitting (tight against right border in overlay mode)
+        // Camera & perspective fitting (normal vs full-height centered immersive vs overlay)
         val texAspect = baseTex.width.toFloat() / baseTex.height.toFloat().coerceAtLeast(1f)
         val screenAspect = viewWidth.toFloat() / viewHeight.toFloat().coerceAtLeast(1f)
-        val fillH = if (isOverlay) 1.02f else 0.80f
-        val fillW = if (isOverlay) 0.99f else 0.96f
+        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive)
         val tanHalfFov = tan(Math.toRadians(FOV_DEG * 0.5)).toFloat()
-        val visHalfH = max(1.0f / fillH, texAspect / (fillW * screenAspect))
+        val visHalfH = computeVisibleHalfHeight(texAspect, screenAspect, framing)
         val camDist = visHalfH / tanHalfFov
 
         Matrix.perspectiveM(projMatrix, 0, FOV_DEG, screenAspect, 0.4f, 24f)
@@ -283,8 +283,8 @@ class SpriteAvatarRenderer {
                 sin(t * 0.46f) * 0.9f + smoothDragX * 2.0f
         }
 
-        val screenShiftX = if (isOverlay) 0.018f * visHalfH else 0f
-        val screenShiftY = (if (isOverlay) 0.0f else -0.04f) * visHalfH
+        val screenShiftX = framing.shiftXFraction * visHalfH
+        val screenShiftY = framing.shiftYFraction * visHalfH
         val baseShiftX = screenShiftX + smoothDragX * 0.040f + angerShakeX
         val baseShiftY = screenShiftY + breathOffsetY + bounceOffsetY - smoothDragY * 0.035f
 
@@ -943,14 +943,16 @@ class SpriteAvatarRenderer {
         dragX: Float,
         dragY: Float,
         opacity: Float,
-        isOverlay: Boolean
+        isOverlay: Boolean,
+        isImmersive: Boolean
     ) {
         if (shaderProgramId == 0) return
         val quad = ensureFallbackSprite(shaderProgramId)
         quad.setWindowSize(viewWidth, viewHeight)
         val aspect = activeTex.width.toFloat() / activeTex.height.toFloat().coerceAtLeast(1f)
-        val maxH = viewHeight * if (isOverlay) 0.94f else 0.78f
-        val maxW = viewWidth * if (isOverlay) 0.94f else 0.92f
+        val framing = resolveFraming(isOverlay = isOverlay, isImmersive = isImmersive)
+        val maxH = viewHeight * framing.fallbackMaxHFactor
+        val maxW = viewWidth * framing.fallbackMaxWFactor
         var drawH = maxH
         var drawW = drawH * aspect
         if (drawW > maxW) {
@@ -958,7 +960,7 @@ class SpriteAvatarRenderer {
             drawH = drawW / aspect
         }
         val centerX = viewWidth * 0.5f + dragX.coerceIn(-1f, 1f) * viewWidth * 0.025f
-        val centerY = viewHeight * (if (isOverlay) 0.50f else 0.52f) + dragY.coerceIn(-1f, 1f) * viewHeight * 0.025f
+        val centerY = viewHeight * framing.fallbackCenterYFactor + dragY.coerceIn(-1f, 1f) * viewHeight * 0.025f
         quad.resize(centerX, centerY, drawW, drawH)
 
         GLES20.glUseProgram(shaderProgramId)
@@ -1133,6 +1135,59 @@ class SpriteAvatarRenderer {
                     put(indices)
                     position(0)
                 }
+        }
+
+        internal data class AvatarFraming(
+            val fillH: Float,
+            val fillW: Float,
+            val shiftXFraction: Float,
+            val shiftYFraction: Float,
+            val aspectWidthFactor: Float,
+            val fallbackMaxHFactor: Float,
+            val fallbackMaxWFactor: Float,
+            val fallbackCenterYFactor: Float
+        )
+
+        internal fun resolveFraming(isOverlay: Boolean, isImmersive: Boolean): AvatarFraming = when {
+            isOverlay -> AvatarFraming(
+                fillH = 1.02f,
+                fillW = 0.99f,
+                shiftXFraction = 0.018f,
+                shiftYFraction = 0.0f,
+                aspectWidthFactor = 1.0f,
+                fallbackMaxHFactor = 0.94f,
+                fallbackMaxWFactor = 0.94f,
+                fallbackCenterYFactor = 0.50f
+            )
+            isImmersive -> AvatarFraming(
+                fillH = 1.00f,
+                fillW = 1.00f,
+                shiftXFraction = 0.0f,
+                shiftYFraction = 0.0f,
+                aspectWidthFactor = 0.72f,
+                fallbackMaxHFactor = 1.00f,
+                fallbackMaxWFactor = 1.38f,
+                fallbackCenterYFactor = 0.50f
+            )
+            else -> AvatarFraming(
+                fillH = 0.80f,
+                fillW = 0.96f,
+                shiftXFraction = 0.0f,
+                shiftYFraction = -0.04f,
+                aspectWidthFactor = 1.0f,
+                fallbackMaxHFactor = 0.78f,
+                fallbackMaxWFactor = 0.92f,
+                fallbackCenterYFactor = 0.52f
+            )
+        }
+
+        internal fun computeVisibleHalfHeight(
+            texAspect: Float,
+            screenAspect: Float,
+            framing: AvatarFraming
+        ): Float {
+            val effectiveAspect = texAspect * framing.aspectWidthFactor
+            return max(1.0f / framing.fillH, effectiveAspect / (framing.fillW * screenAspect))
         }
 
         fun resolveSupportedEmotion(rawEmotion: String): String {
