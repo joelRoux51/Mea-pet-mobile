@@ -131,13 +131,17 @@ class MainActivity : ComponentActivity() {
         try {
             val themeMode = container.settingsManager.getThemeMode()
             val isImmersiveInit = container.settingsManager.getDisplayMode() == SettingsKeys.DISPLAY_MODE_IMMERSIVE
+            val isDeskBuddyInit = container.live2dModelStore
+                .findById(container.settingsManager.getActiveLive2dModel())
+                .renderType.isDeskBuddyEyes
             val isDark = isDarkTheme(this, themeMode)
             val bg = if (isDark) intArrayOf(0x14, 0x14, 0x14) else intArrayOf(0xF7, 0xF7, 0xF7)
             Live2dDelegate.getInstance().let { d ->
                 d.immersiveMode = isImmersiveInit
+                d.deskBuddyOledMode = isDeskBuddyInit
                 d.bgR = bg[0] / 255f; d.bgG = bg[1] / 255f; d.bgB = bg[2] / 255f; d.bgA = 1.0f
             }
-            val initWinBg = if (isImmersiveInit) {
+            val initWinBg = if (isImmersiveInit || isDeskBuddyInit) {
                 0xFF000000.toInt()
             } else {
                 0xFF000000.toInt() or (bg[0] shl 16) or (bg[1] shl 8) or bg[2]
@@ -182,18 +186,34 @@ class MainActivity : ComponentActivity() {
                     .collectAsState(initial = container.settingsManager.getDisplayMode())
                 val isImmersive = displayMode == SettingsKeys.DISPLAY_MODE_IMMERSIVE
 
-                // Live2D 背景色跟随主题（onCreate 已同步预置首帧主题色，此处响应后续切换）
+                // Live2D 模型切换：设置变化时通知 GL 线程重建模型
+                val activeModelId by container.settingsManager.activeLive2dModelFlow
+                    .collectAsState(initial = container.settingsManager.getActiveLive2dModel())
+                val isDeskBuddyEyes = remember(activeModelId) {
+                    container.live2dModelStore.findById(activeModelId).renderType.isDeskBuddyEyes
+                }
+                LaunchedEffect(activeModelId) {
+                    val spec = container.live2dModelStore.findById(activeModelId)
+                    if (Live2dManager.getInstance().setActiveModel(spec)) {
+                        glSurfaceView.queueEvent {
+                            Live2dManager.getInstance().resetModel()
+                        }
+                    }
+                }
+
+                // Live2D 背景色跟随主题（Desk Buddy 与沉浸模式强制 OLED 纯黑省电）
                 val bgColor = remember(themeMode) {
                     val isDark = isDarkTheme(this@MainActivity, themeMode)
                     if (isDark) floatArrayOf(0.08f, 0.08f, 0.08f)
                     else floatArrayOf(0.97f, 0.97f, 0.97f)
                 }
-                LaunchedEffect(isImmersive, bgColor) {
+                LaunchedEffect(isImmersive, isDeskBuddyEyes, bgColor) {
                     Live2dDelegate.getInstance().let { d ->
                         d.immersiveMode = isImmersive
+                        d.deskBuddyOledMode = isDeskBuddyEyes
                         d.bgR = bgColor[0]; d.bgG = bgColor[1]; d.bgB = bgColor[2]; d.bgA = 1.0f
                     }
-                    val winColor = if (isImmersive) {
+                    val winColor = if (isImmersive || isDeskBuddyEyes) {
                         0xFF000000.toInt()
                     } else {
                         val r = (bgColor[0] * 255).toInt()
@@ -214,18 +234,6 @@ class MainActivity : ComponentActivity() {
                 }
                 LaunchedEffect(wallpaperBlur) {
                     Live2dDelegate.getInstance().wallpaperBlur = wallpaperBlur.toFloat()
-                }
-
-                // Live2D 模型切换：设置变化时通知 GL 线程重建模型
-                val activeModelId by container.settingsManager.activeLive2dModelFlow
-                    .collectAsState(initial = container.settingsManager.getActiveLive2dModel())
-                LaunchedEffect(activeModelId) {
-                    val spec = container.live2dModelStore.findById(activeModelId)
-                    if (Live2dManager.getInstance().setActiveModel(spec)) {
-                        glSurfaceView.queueEvent {
-                            Live2dManager.getInstance().resetModel()
-                        }
-                    }
                 }
 
                 // ── 隐私/更新弹窗 ──
@@ -299,6 +307,7 @@ class MainActivity : ComponentActivity() {
                     }
                     ChatScreenContent(
                         displayMode = displayMode,
+                        isDeskBuddyEyes = isDeskBuddyEyes,
                         onToggleImmersiveMode = {
                             val next = if (isImmersive) {
                                 SettingsKeys.DISPLAY_MODE_NORMAL

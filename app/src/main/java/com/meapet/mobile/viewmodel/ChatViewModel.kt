@@ -93,6 +93,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val CHARACTER_BUBBLE_TIMEOUT_MS = 10_000L
+        private const val NOTIFICATION_BUBBLE_TIMEOUT_MS = 45_000L
     }
 
     init {
@@ -190,7 +191,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     characterBubbleJob?.cancel()
                     characterBubbleJob = viewModelScope.launch {
-                        delay(CHARACTER_BUBBLE_TIMEOUT_MS)
+                        delay(NOTIFICATION_BUBBLE_TIMEOUT_MS)
                         _state.update { current ->
                             if (current.characterBubble?.id == bubble.id) {
                                 current.copy(characterBubble = null)
@@ -346,7 +347,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             .let { list -> list + listOf(userMsg, assistantMsg) }
                         current.copy(
                             messages = updatedMessages,
-                            isLoading = false
+                            isLoading = false,
+                            characterBubble = if (current.characterBubble?.isTelegram == true) {
+                                null
+                            } else {
+                                current.characterBubble
+                            }
                         )
                     }
                     // 主界面语音（模型就绪且开关开启时才真正发声，否则静默跳过）

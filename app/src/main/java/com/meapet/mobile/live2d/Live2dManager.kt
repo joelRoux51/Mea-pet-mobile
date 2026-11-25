@@ -60,6 +60,7 @@ class Live2dManager private constructor() {
     private var modelLoaded = false
 
     private val spriteRenderer = SpriteAvatarRenderer()
+    private val deskBuddyRenderer = DeskBuddyEyesRenderer()
 
     @Volatile
     private var dragX = 0f
@@ -135,6 +136,7 @@ class Live2dManager private constructor() {
         modelLoaded = false
         loadedSpec = null
         spriteRenderer.reset()
+        deskBuddyRenderer.reset()
         model?.deleteModel()
         model = null
         loadModel()
@@ -159,6 +161,23 @@ class Live2dManager private constructor() {
                 Log.d(TAG, "Sprite/Face avatar loaded successfully: ${spec.displayName}")
             } else {
                 Log.e(TAG, "Failed to load sprite/face avatar: ${spec.displayName}")
+                activeSpec = Live2dModelStore.BUILT_IN_MODEL
+                loadedSpec = null
+                modelLoaded = false
+                loadModel()
+            }
+            return
+        }
+        if (spec.renderType.isDeskBuddyEyes) {
+            Log.d(TAG, "Loading Desk Buddy OLED eyes: ${spec.displayName} (${spec.renderType})")
+            val ok = deskBuddyRenderer.load(spec.renderType)
+            if (ok) {
+                model = null
+                loadedSpec = spec
+                modelLoaded = true
+                Log.d(TAG, "Desk Buddy OLED eyes loaded successfully: ${spec.displayName}")
+            } else {
+                Log.e(TAG, "Failed to load Desk Buddy OLED eyes: ${spec.displayName}")
                 activeSpec = Live2dModelStore.BUILT_IN_MODEL
                 loadedSpec = null
                 modelLoaded = false
@@ -218,6 +237,27 @@ class Live2dManager private constructor() {
                 viewHeight = height,
                 shaderProgramId = delegate.view.spriteShaderProgramId,
                 shader3d = delegate.view.sprite3dShader,
+                dragX = dragX,
+                dragY = dragY,
+                opacity = 1f,
+                isOverlay = false,
+                isImmersive = delegate.immersiveMode
+            )
+            return
+        }
+
+        if (loadedSpec?.renderType?.isDeskBuddyEyes == true) {
+            latestEmotionRef.get()?.let { req ->
+                if (req.sequence != lastAppliedMainSequence) {
+                    lastAppliedMainSequence = req.sequence
+                    deskBuddyRenderer.setEmotion(req.emotion)
+                    Log.d(TAG, "Emotion '${req.emotion}' applied on Desk Buddy OLED eyes")
+                }
+            }
+            deskBuddyRenderer.draw(
+                viewWidth = width,
+                viewHeight = height,
+                shaderProgramId = delegate.view.spriteShaderProgramId,
                 dragX = dragX,
                 dragY = dragY,
                 opacity = 1f,

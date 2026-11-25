@@ -108,6 +108,7 @@ private enum class Page { CHAT, SETTINGS }
 @Composable
 fun ChatScreenContent(
     displayMode: String = SettingsKeys.Defaults.DISPLAY_MODE,
+    isDeskBuddyEyes: Boolean = false,
     onToggleImmersiveMode: () -> Unit = {},
     onToggleOverlay: () -> Unit = {},
     chatViewModel: ChatViewModel = viewModel()
@@ -173,6 +174,7 @@ fun ChatScreenContent(
             Page.CHAT -> ChatPage(
                 chatViewModel = chatViewModel,
                 isImmersive = isImmersive,
+                isDeskBuddyEyes = isDeskBuddyEyes,
                 onToggleImmersiveMode = onToggleImmersiveMode,
                 onToggleOverlay = onToggleOverlay,
                 onOpenSettings = { currentPage = Page.SETTINGS }
@@ -188,6 +190,7 @@ fun ChatScreenContent(
 private fun ChatPage(
     chatViewModel: ChatViewModel,
     isImmersive: Boolean,
+    isDeskBuddyEyes: Boolean,
     onToggleImmersiveMode: () -> Unit,
     onToggleOverlay: () -> Unit,
     onOpenSettings: () -> Unit
@@ -196,8 +199,8 @@ private fun ChatPage(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    DisposableEffect(isImmersive) {
-        if (!isImmersive) {
+    DisposableEffect(isImmersive, isDeskBuddyEyes) {
+        if (!isImmersive && !isDeskBuddyEyes) {
             Live2dDelegate.getInstance().touchExclusionTopY = Float.MAX_VALUE
         }
         onDispose {
@@ -222,14 +225,15 @@ private fun ChatPage(
     val bubbleAlphaState = bubbleAlphaFlow.collectAsState(initial = SettingsKeys.Defaults.CHAT_BUBBLE_ALPHA)
     val bubbleAlpha = bubbleAlphaState.value.toFloat()
 
-    // Visual-novel dialogue bubble in Immersive mode: displays webhook pushes, tap reactions, or new replies above the character
-    var immersiveVnBubble by remember { mutableStateOf<CharacterBubbleUi?>(null) }
+    // Visual-novel dialogue bubble in Immersive or Desk Buddy OLED mode: displays webhook notifications, tap reactions, or replies
+    val showVnBubble = isImmersive || isDeskBuddyEyes
+    var deskVnBubble by remember { mutableStateOf<CharacterBubbleUi?>(null) }
     var lastHandledSystemId by remember { mutableStateOf<String?>(null) }
     var lastHandledAssistantId by remember {
         mutableStateOf(state.messages.lastOrNull { it.role == ChatRole.assistant }?.id)
     }
 
-    val characterDisplayName = remember(state.messages.size, isImmersive) {
+    val characterDisplayName = remember(state.messages.size, isImmersive, isDeskBuddyEyes) {
         Live2dManager.getInstance().activeSpec.displayName
             .removeSuffix(" (2D)")
             .ifBlank { "Mea" }
@@ -238,41 +242,41 @@ private fun ChatPage(
     val latestSystemMsg = state.messages.lastOrNull { it.role == ChatRole.system }
     val latestAssistantMsg = state.messages.lastOrNull { it.role == ChatRole.assistant }
 
-    LaunchedEffect(isImmersive, latestSystemMsg?.id, latestSystemMsg?.content) {
-        if (!isImmersive) {
-            immersiveVnBubble = null
+    LaunchedEffect(showVnBubble, latestSystemMsg?.id, latestSystemMsg?.content) {
+        if (!showVnBubble) {
+            deskVnBubble = null
             lastHandledSystemId = latestSystemMsg?.id
             return@LaunchedEffect
         }
         if (latestSystemMsg != null && latestSystemMsg.id != lastHandledSystemId) {
             lastHandledSystemId = latestSystemMsg.id
-            immersiveVnBubble = CharacterBubbleUi(
+            deskVnBubble = CharacterBubbleUi(
                 id = latestSystemMsg.id,
                 sender = characterDisplayName,
                 text = latestSystemMsg.content,
                 isTelegram = false
             )
-        } else if (latestSystemMsg == null && immersiveVnBubble?.id == lastHandledSystemId) {
-            immersiveVnBubble = null
+        } else if (latestSystemMsg == null && deskVnBubble?.id == lastHandledSystemId) {
+            deskVnBubble = null
         }
     }
 
     LaunchedEffect(
-        isImmersive,
+        showVnBubble,
         latestAssistantMsg?.id,
         latestAssistantMsg?.content,
         latestAssistantMsg?.isStreaming
     ) {
-        if (!isImmersive) {
+        if (!showVnBubble) {
             lastHandledAssistantId = latestAssistantMsg?.id
             return@LaunchedEffect
         }
         if (latestAssistantMsg != null && latestAssistantMsg.content.isNotBlank()) {
             val isNewReply = latestAssistantMsg.id != lastHandledAssistantId
-            val isUpdatingCurrentVn = immersiveVnBubble?.id == latestAssistantMsg.id
+            val isUpdatingCurrentVn = deskVnBubble?.id == latestAssistantMsg.id
             if (isNewReply || isUpdatingCurrentVn) {
                 lastHandledAssistantId = latestAssistantMsg.id
-                immersiveVnBubble = CharacterBubbleUi(
+                deskVnBubble = CharacterBubbleUi(
                     id = latestAssistantMsg.id,
                     sender = characterDisplayName,
                     text = latestAssistantMsg.content,
@@ -282,26 +286,26 @@ private fun ChatPage(
         }
     }
 
-    LaunchedEffect(immersiveVnBubble?.id, immersiveVnBubble?.text, latestAssistantMsg?.isStreaming) {
-        val active = immersiveVnBubble ?: return@LaunchedEffect
+    LaunchedEffect(deskVnBubble?.id, deskVnBubble?.text, latestAssistantMsg?.isStreaming) {
+        val active = deskVnBubble ?: return@LaunchedEffect
         val isActiveStreaming = latestAssistantMsg?.id == active.id && latestAssistantMsg.isStreaming
         if (!isActiveStreaming) {
-            delay(9_000L)
-            if (immersiveVnBubble?.id == active.id) {
-                immersiveVnBubble = null
+            delay(if (active.isTelegram) 45_000L else 10_000L)
+            if (deskVnBubble?.id == active.id) {
+                deskVnBubble = null
             }
         }
     }
 
-    val activeCharacterBubble = if (isImmersive) {
-        state.characterBubble ?: immersiveVnBubble
+    val activeCharacterBubble = if (showVnBubble) {
+        state.characterBubble ?: deskVnBubble
     } else {
         state.characterBubble
     }
 
     // 新消息或错误卡片出现时自动滚动到底部。
     // 错误卡片是列表末尾的额外 item，所以它出现时也要滚一次，否则用户看不到重试按钮。
-    LaunchedEffect(state.messages.size, state.error, isImmersive) {
+    LaunchedEffect(state.messages.size, state.error, isImmersive, isDeskBuddyEyes) {
         val lastIndex = state.messages.size - 1 + if (state.error != null) 1 else 0
         if (lastIndex >= 0) {
             listState.animateScrollToItem(lastIndex)
@@ -350,6 +354,78 @@ private fun ChatPage(
                         Live2dDelegate.getInstance().touchExclusionTopY = coords.boundsInWindow().top
                     }
             )
+        } else if (isDeskBuddyEyes) {
+            // ── Desk Buddy OLED Normal Mode: Pure-black top zone for eyes, notification bubble & reply chat below ──
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.35f)
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(0.65f)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.0f),
+                                    Color.Black.copy(alpha = 0.88f),
+                                    Color.Black
+                                )
+                            )
+                        )
+                        .onGloballyPositioned { coords ->
+                            Live2dDelegate.getInstance().touchExclusionTopY = coords.boundsInWindow().top
+                        }
+                ) {
+                    AnimatedVisibility(
+                        visible = activeCharacterBubble != null,
+                        enter = fadeIn() + scaleIn(initialScale = 0.94f),
+                        exit = fadeOut() + scaleOut(targetScale = 0.94f),
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        activeCharacterBubble?.let { bubble ->
+                            CharacterDialogueBubble(
+                                bubble = bubble,
+                                darkOled = true,
+                                pointerUp = true,
+                                onDismiss = {
+                                    if (state.characterBubble?.id == bubble.id) {
+                                        chatViewModel.onEvent(ChatEvent.DismissCharacterBubble)
+                                    }
+                                    if (deskVnBubble?.id == bubble.id) {
+                                        deskVnBubble = null
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    MessageList(
+                        state = state,
+                        listState = listState,
+                        bubbleAlpha = bubbleAlpha,
+                        glassmorphism = true,
+                        onDismissError = { chatViewModel.onEvent(ChatEvent.DismissError) },
+                        onRetry = { chatViewModel.onEvent(ChatEvent.RetryLastMessage) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                    )
+
+                    ChatInputBar(
+                        inputText = state.inputText,
+                        onInputChange = { chatViewModel.onEvent(ChatEvent.UpdateInput(it)) },
+                        onSend = { chatViewModel.onEvent(ChatEvent.SendMessage(state.inputText)) },
+                        isLoading = state.isLoading,
+                        glassmorphism = true
+                    )
+                }
+            }
         } else {
             // ── Normal Mode: Classic full-screen MessageList + Bottom ChatInputBar ──
             MessageList(
@@ -377,7 +453,7 @@ private fun ChatPage(
 
         // ── Layer 2: 顶部菜单与角色对话气泡 (Visual Novel style above character) ──
         AnimatedVisibility(
-            visible = activeCharacterBubble != null,
+            visible = activeCharacterBubble != null && (isImmersive || !isDeskBuddyEyes),
             enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut() + scaleOut(targetScale = 0.9f),
             modifier = Modifier
@@ -387,13 +463,14 @@ private fun ChatPage(
             activeCharacterBubble?.let { bubble ->
                 CharacterDialogueBubble(
                     bubble = bubble,
-                    isImmersive = isImmersive,
+                    darkOled = isImmersive || isDeskBuddyEyes,
+                    pointerUp = false,
                     onDismiss = {
                         if (state.characterBubble?.id == bubble.id) {
                             chatViewModel.onEvent(ChatEvent.DismissCharacterBubble)
                         }
-                        if (immersiveVnBubble?.id == bubble.id) {
-                            immersiveVnBubble = null
+                        if (deskVnBubble?.id == bubble.id) {
+                            deskVnBubble = null
                         }
                     }
                 )
@@ -734,30 +811,42 @@ private fun MemoryDialog(
     }
 }
 
-/** Speech bubble displayed directly above the Live2D character (visual-novel style). */
+/** Speech bubble displayed near the Live2D character or Desk Buddy eyes (visual-novel / notification style). */
 @Composable
 private fun CharacterDialogueBubble(
     bubble: CharacterBubbleUi,
-    isImmersive: Boolean = false,
+    darkOled: Boolean = false,
+    pointerUp: Boolean = false,
     onDismiss: () -> Unit
 ) {
-    val containerColor = if (isImmersive) {
-        Color(0xFF131826).copy(alpha = 0.84f)
+    val containerColor = if (darkOled) {
+        Color(0xFF0E1524).copy(alpha = 0.90f)
     } else {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
     }
-    val textColor = if (isImmersive) Color.White else MaterialTheme.colorScheme.onSurface
-    val dismissTint = if (isImmersive) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
-    val borderStroke = if (isImmersive) BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)) else null
+    val textColor = if (darkOled) Color.White else MaterialTheme.colorScheme.onSurface
+    val dismissTint = if (darkOled) Color.White.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val borderStroke = if (darkOled) BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.42f)) else null
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (pointerUp) {
+            Canvas(modifier = Modifier.size(width = 18.dp, height = 9.dp)) {
+                val path = Path().apply {
+                    moveTo(0f, size.height)
+                    lineTo(size.width / 2f, 0f)
+                    lineTo(size.width, size.height)
+                    close()
+                }
+                drawPath(path = path, color = containerColor)
+            }
+        }
         Surface(
-            modifier = Modifier.widthIn(min = 160.dp, max = 310.dp),
+            modifier = Modifier.widthIn(min = 180.dp, max = 330.dp),
             shape = RoundedCornerShape(18.dp),
             color = containerColor,
             border = borderStroke,
-            tonalElevation = if (isImmersive) 0.dp else 6.dp,
-            shadowElevation = if (isImmersive) 8.dp else 6.dp
+            tonalElevation = if (darkOled) 0.dp else 6.dp,
+            shadowElevation = if (darkOled) 8.dp else 6.dp
         ) {
             Column(modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -769,7 +858,7 @@ private fun CharacterDialogueBubble(
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (darkOled) Color(0xFF38BDF8) else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(Modifier.width(4.dp))
@@ -789,21 +878,23 @@ private fun CharacterDialogueBubble(
                     text = bubble.text,
                     style = MaterialTheme.typography.bodyMedium,
                     color = textColor,
-                    maxLines = if (isImmersive) 4 else Int.MAX_VALUE,
+                    maxLines = if (darkOled) 4 else Int.MAX_VALUE,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }
         }
-        // Downward pointer tail toward the Live2D character
-        Canvas(modifier = Modifier.size(width = 18.dp, height = 9.dp)) {
-            val path = Path().apply {
-                moveTo(0f, 0f)
-                lineTo(size.width / 2f, size.height)
-                lineTo(size.width, 0f)
-                close()
+        if (!pointerUp) {
+            // Downward pointer tail toward the Live2D character
+            Canvas(modifier = Modifier.size(width = 18.dp, height = 9.dp)) {
+                val path = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(size.width / 2f, size.height)
+                    lineTo(size.width, 0f)
+                    close()
+                }
+                drawPath(path = path, color = containerColor)
             }
-            drawPath(path = path, color = containerColor)
         }
     }
 }

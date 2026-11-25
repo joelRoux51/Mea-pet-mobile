@@ -8,6 +8,7 @@ import com.live2d.sdk.cubism.framework.math.CubismMatrix44
 import com.live2d.sdk.cubism.framework.rendering.android.CubismOffscreenManagerAndroid
 import com.live2d.sdk.cubism.framework.rendering.android.CubismShaderAndroid
 import com.meapet.mobile.live2d.AvatarRenderType
+import com.meapet.mobile.live2d.DeskBuddyEyesRenderer
 import com.meapet.mobile.live2d.Live2dManager
 import com.meapet.mobile.live2d.Live2dModel
 import com.meapet.mobile.live2d.Live2dModelSpec
@@ -40,6 +41,7 @@ class Live2dOverlayRenderer(
     private var spriteShader: Live2dSpriteShader? = null
     private var sprite3dShader: Sprite3dShader? = null
     private val spriteRenderer = SpriteAvatarRenderer()
+    private val deskBuddyRenderer = DeskBuddyEyesRenderer()
     private val projection = CubismMatrix44.create()
     private var winWidth = 0
     private var winHeight = 0
@@ -72,6 +74,7 @@ class Live2dOverlayRenderer(
      */
     fun releaseModel() {
         spriteRenderer.reset()
+        deskBuddyRenderer.reset()
         model?.deleteModel()
         model = null
         modelLoaded = false
@@ -153,6 +156,27 @@ class Live2dOverlayRenderer(
                 return
             }
 
+            if (loadedSpec?.renderType?.isDeskBuddyEyes == true) {
+                GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f)
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+                Live2dManager.getInstance().latestEmotionRequest()?.let { req ->
+                    if (req.sequence != lastAppliedEmotionSequence) {
+                        lastAppliedEmotionSequence = req.sequence
+                        deskBuddyRenderer.setEmotion(req.emotion)
+                    }
+                }
+                deskBuddyRenderer.draw(
+                    viewWidth = winWidth,
+                    viewHeight = winHeight,
+                    shaderProgramId = spriteShader?.programId ?: 0,
+                    dragX = 0f,
+                    dragY = 0f,
+                    opacity = opacity,
+                    isOverlay = true
+                )
+                return
+            }
+
             val m = model ?: return
             // 先做空值判断再进离屏，避免中途 return 把离屏目标留在绑定状态
             val core = m.model ?: return
@@ -226,6 +250,16 @@ class Live2dOverlayRenderer(
                 model = null
                 loadedSpec = spec
                 Log.d(TAG, "Overlay sprite/face avatar loaded: ${spec.displayName} (face=$isFaceModel)")
+                return
+            }
+            if (spec.renderType.isDeskBuddyEyes) {
+                val ok = deskBuddyRenderer.load(spec.renderType)
+                if (!ok) {
+                    throw IllegalStateException("Failed to load Desk Buddy OLED eyes (${spec.renderType})")
+                }
+                model = null
+                loadedSpec = spec
+                Log.d(TAG, "Overlay Desk Buddy OLED eyes loaded: ${spec.displayName}")
                 return
             }
             val fileName = spec.modelJsonName

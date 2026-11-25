@@ -97,11 +97,15 @@ object Live2dEmotion {
     )
     private val BIBLE_REF_REGEX = Regex("""\b\d{1,3}:\d{1,3}\b""")
     private val SURPRISE_KEYWORDS = listOf(
-        "debout", "reveil", "alarme", "minuteur", "appel manque", "appels manques",
-        "urgent", "waouh", "incroyable", "oh !", "attention !"
+        "debout", "reveil", "alarme", "minuteur", "rappel", "appel manque", "appels manques",
+        "urgent", "urgence", "alerte", "waouh", "incroyable", "oh !", "attention !"
     )
     private val SLEEP_KEYWORDS = listOf(
-        "bonne nuit", "fatigu", "sommeil", "baillement", "baille", "dormir", "dodo"
+        "bonne nuit", "fatigu", "sommeil", "baillement", "baille", "dormir", "dodo",
+        "batterie faible", "low battery", "battery low"
+    )
+    private val ANGER_KEYWORDS = listOf(
+        "erreur critique", "echec critique", "alerte rouge", "batterie critique"
     )
     private val STRETCH_KEYWORDS = listOf(
         "etire", "detend", "stretch"
@@ -113,7 +117,8 @@ object Live2dEmotion {
     private val CURIOSITY_KEYWORDS = listOf(
         "photo", "image", "camera", "que vois-tu", "regarde", "analyse",
         "ecoute ce vocal", "message vocal", "curieux", "intriguant",
-        "notification", "appels", "sms"
+        "notification", "notif", "appels", "sms", "whatsapp", "telegram",
+        "email", "nouveau message", "nouvel e-mail"
     )
     private val WINK_KEYWORDS = listOf(
         "clin d'oeil", "c'est note", "voix changee", "vitesse reglee", "avec plaisir"
@@ -133,6 +138,7 @@ object Live2dEmotion {
             PRAYER_KEYWORDS.any { combined.contains(it) } ||
                 (BIBLE_REF_REGEX.containsMatchIn(combined) &&
                     (combined.contains("dieu") || combined.contains("christ") || combined.contains("jesus"))) -> EMOTION_CALME
+            ANGER_KEYWORDS.any { combined.contains(it) } -> EMOTION_COLERE
             SURPRISE_KEYWORDS.any { combined.contains(it) } -> EMOTION_SURPRISE
             SLEEP_KEYWORDS.any { combined.contains(it) } -> EMOTION_FATIGUE
             STRETCH_KEYWORDS.any { combined.contains(it) } -> EMOTION_ETIREMENT

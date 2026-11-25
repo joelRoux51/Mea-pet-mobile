@@ -96,6 +96,10 @@ class Live2dDelegate private constructor() {
     @Volatile
     var immersiveMode = false
 
+    /** OLED black battery-saving background mode forced by Desk Buddy eyes-only models. */
+    @Volatile
+    var deskBuddyOledMode = false
+
     /** Window Y pixel threshold below which taps belong to the floating chat UI (ignored for character taps). */
     @Volatile
     var touchExclusionTopY: Float = Float.MAX_VALUE
@@ -210,8 +214,9 @@ class Live2dDelegate private constructor() {
 
         Live2dPal.updateTime()
 
-        val isImmersive = immersiveMode
-        if (isImmersive) {
+        val isOledBlack = immersiveMode || deskBuddyOledMode ||
+            Live2dManager.getInstance().activeSpec.renderType.isDeskBuddyEyes
+        if (isOledBlack) {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
             GLES20.glClearDepthf(1.0f)
@@ -310,22 +315,25 @@ class Live2dDelegate private constructor() {
     private fun detectZone(x: Float, y: Float): Pair<TouchReactionHelper.TapReaction, String>? {
         if (windowWidth <= 0 || windowHeight <= 0) return null
         val isImmersive = immersiveMode
-        if (isImmersive && y >= touchExclusionTopY) return null
+        val renderType = Live2dManager.getInstance().activeSpec.renderType
+        val isDeskBuddy = renderType.isDeskBuddyEyes
+        if ((isImmersive || isDeskBuddy) && y >= touchExclusionTopY) return null
 
         val nx = (x / windowWidth) * 2f - 1f
         val ny = -((y / windowHeight) * 2f - 1f)
 
-        val renderType = Live2dManager.getInstance().activeSpec.renderType
         val isAlita = renderType.isAlitaSpriteFamily
         val isAlitaFace = renderType == AvatarRenderType.ALITA_FACE_LIVE2D
         if (isImmersive) {
             when {
+                isDeskBuddy -> if (nx < -0.92f || nx > 0.92f || ny < -0.35f || ny > 0.65f) return null
                 isAlitaFace -> if (nx < -0.88f || nx > 0.88f || ny < -0.72f || ny > 0.82f) return null
                 isAlita -> if (nx < -0.92f || nx > 0.92f || ny < -0.96f || ny > 0.96f) return null
                 else -> if (nx < -0.78f || nx > 0.78f || ny < -0.92f || ny > 0.92f) return null
             }
         } else {
             when {
+                isDeskBuddy -> if (nx < -0.88f || nx > 0.88f || ny < 0.26f || ny > 0.88f) return null
                 isAlitaFace -> if (nx < -0.82f || nx > 0.82f || ny < -0.72f || ny > 0.72f) return null
                 isAlita -> if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
                 else -> if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
@@ -333,6 +341,8 @@ class Live2dDelegate private constructor() {
         }
 
         val splitY = when {
+            isDeskBuddy && isImmersive -> 0.12f
+            isDeskBuddy -> 0.58f
             isAlitaFace -> 0.08f
             isImmersive && isAlita -> 0.22f
             isImmersive -> 0.05f
@@ -357,7 +367,7 @@ class Live2dDelegate private constructor() {
             availableFiles = files,
             nowMs = System.currentTimeMillis(),
             langCode = langCode,
-            isAlita = isAlita,
+            isAlita = isAlita || isDeskBuddy,
             picker = { bound -> secureRandom.nextInt(bound) }
         ) ?: return null
 

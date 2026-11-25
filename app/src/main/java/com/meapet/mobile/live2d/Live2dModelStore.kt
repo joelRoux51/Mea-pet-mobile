@@ -20,22 +20,29 @@ import java.util.zip.ZipInputStream
 enum class AvatarRenderType {
     LIVE2D,
     SPRITE_2D,
-    ALITA_FACE_LIVE2D;
+    ALITA_FACE_LIVE2D,
+    DESK_BUDDY_PIXEL,
+    DESK_BUDDY_VECTOR,
+    DESK_BUDDY_ALITA_EYES;
 
     val isAlitaSpriteFamily: Boolean
         get() = this == SPRITE_2D || this == ALITA_FACE_LIVE2D
+
+    val isDeskBuddyEyes: Boolean
+        get() = this == DESK_BUDDY_PIXEL ||
+            this == DESK_BUDDY_VECTOR ||
+            this == DESK_BUDDY_ALITA_EYES
 }
 
 /**
  * Runtime specification of an avatar model (built-in Mea Live2D, built-in Alita 2D sprites,
- * built-in Alita Face Live2D, or an imported external Live2D model).
+ * built-in Alita Face Live2D, built-in Desk Buddy OLED eyes, or an imported external Live2D model).
  *
- * @property id Empty string for built-in Mea, [Live2dModelStore.ALITA_SPRITE_MODEL_ID] for built-in Alita 2D,
- * [Live2dModelStore.ALITA_FACE_MODEL_ID] for built-in Alita Face Live2D, UUID string for imported models.
+ * @property id Empty string for built-in Mea, or a built-in constant ID, or UUID string for imported models.
  * @property displayName Human-readable model name shown in settings.
  * @property dirPath Directory path ending with `/`. Asset-relative for built-in, absolute filesystem path for imported.
  * @property modelJsonName Relative filename of the `.model3.json` (or default PNG) inside [dirPath].
- * @property isBuiltIn True when using bundled APK assets.
+ * @property isBuiltIn True when using bundled APK assets or built-in procedural renderer.
  * @property renderType Rendering pipeline used for this avatar.
  */
 data class Live2dModelSpec(
@@ -85,6 +92,9 @@ class Live2dModelStore(
 
         const val ALITA_SPRITE_MODEL_ID = "builtin_alita_sprite_2d"
         const val ALITA_FACE_MODEL_ID = "builtin_alita_face_live2d"
+        const val DESK_BUDDY_PIXEL_MODEL_ID = "builtin_desk_buddy_pixel"
+        const val DESK_BUDDY_VECTOR_MODEL_ID = "builtin_desk_buddy_vector"
+        const val DESK_BUDDY_ALITA_EYES_MODEL_ID = "builtin_desk_buddy_alita_eyes"
 
         val BUILT_IN_MODEL = Live2dModelSpec(
             id = "",
@@ -112,19 +122,56 @@ class Live2dModelStore(
             isBuiltIn = true,
             renderType = AvatarRenderType.ALITA_FACE_LIVE2D
         )
+
+        val DESK_BUDDY_PIXEL_MODEL = Live2dModelSpec(
+            id = DESK_BUDDY_PIXEL_MODEL_ID,
+            displayName = "Desk Buddy Pixel-LED",
+            dirPath = "desk_buddy/pixel/",
+            modelJsonName = "pixel_oled",
+            isBuiltIn = true,
+            renderType = AvatarRenderType.DESK_BUDDY_PIXEL
+        )
+
+        val DESK_BUDDY_VECTOR_MODEL = Live2dModelSpec(
+            id = DESK_BUDDY_VECTOR_MODEL_ID,
+            displayName = "Desk Buddy Vector",
+            dirPath = "desk_buddy/vector/",
+            modelJsonName = "vector_oled",
+            isBuiltIn = true,
+            renderType = AvatarRenderType.DESK_BUDDY_VECTOR
+        )
+
+        val DESK_BUDDY_ALITA_EYES_MODEL = Live2dModelSpec(
+            id = DESK_BUDDY_ALITA_EYES_MODEL_ID,
+            displayName = "Desk Buddy Cyber-Alita",
+            dirPath = "desk_buddy/alita_eyes/",
+            modelJsonName = "alita_eyes_oled",
+            isBuiltIn = true,
+            renderType = AvatarRenderType.DESK_BUDDY_ALITA_EYES
+        )
     }
 
     fun listModels(): List<Live2dModelSpec> {
         val imported = listImportedInternal()
             .sortedBy { it.first.createdAt }
             .map { it.second }
-        return listOf(BUILT_IN_MODEL, ALITA_SPRITE_MODEL, ALITA_FACE_MODEL) + imported
+        return listOf(
+            BUILT_IN_MODEL,
+            ALITA_SPRITE_MODEL,
+            ALITA_FACE_MODEL,
+            DESK_BUDDY_PIXEL_MODEL,
+            DESK_BUDDY_VECTOR_MODEL,
+            DESK_BUDDY_ALITA_EYES_MODEL
+        ) + imported
     }
 
     fun findById(id: String): Live2dModelSpec {
         if (id.isBlank()) return BUILT_IN_MODEL
         if (id == ALITA_SPRITE_MODEL_ID) return ALITA_SPRITE_MODEL
         if (id == ALITA_FACE_MODEL_ID) return ALITA_FACE_MODEL
+        if (id == DESK_BUDDY_PIXEL_MODEL_ID) return DESK_BUDDY_PIXEL_MODEL
+        if (id == DESK_BUDDY_VECTOR_MODEL_ID) return DESK_BUDDY_VECTOR_MODEL
+        if (id == DESK_BUDDY_ALITA_EYES_MODEL_ID) return DESK_BUDDY_ALITA_EYES_MODEL
         return listModels().firstOrNull { it.id == id } ?: BUILT_IN_MODEL
     }
 

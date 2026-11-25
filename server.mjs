@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
 const HOST = '0.0.0.0';
 const ASSETS_ROOT = path.join(__dirname, 'public', 'assets', 'alita_live2d');
+const EXAMPLES_ROOT = path.join(__dirname, 'public', 'assets', 'desk_buddy_examples');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -17,6 +18,30 @@ const MIME_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
 };
+
+const DESK_BUDDY_EXAMPLES = [
+  {
+    id: 'option1',
+    title: 'Option 1 — Desk Buddy Pixel-LED',
+    badge: 'Économie batterie maximale (~92 % noir pur)',
+    file: 'option1_pixel_oled.jpg',
+    desc: 'Matrices LED cyan & ambre façon Dasai Mochi / Desk Buddy rétro-futuriste. Ultra lisible et quasi 100 % des pixels OLED éteints.'
+  },
+  {
+    id: 'option2',
+    title: 'Option 2 — Robot Vector / EMO Lisse',
+    badge: 'Très haute économie · Halo néon doux',
+    file: 'option2_vector_smooth.jpg',
+    desc: 'Grands yeux néon lisses aux coins arrondis avec paupières mobiles et reflets (sans cadre autour en rendu final).'
+  },
+  {
+    id: 'option3',
+    title: 'Option 3 — Yeux Cyber-Alita Minimalistes',
+    badge: 'Haute économie · Style anime Alita',
+    file: 'option3_cyber_alita.jpg',
+    desc: 'Uniquement les iris cyan lumineux et cils néon d’Alita isolés sur noir pur #000000, sans visage ni corps.'
+  }
+];
 
 const POSES = [
   { id: 'normal', label: 'Normal', tag: '[EMOTION: normal]', desc: 'Neutre, attitude calme' },
@@ -54,6 +79,22 @@ const LAYER_FILES = [
 ];
 
 function renderIndexHtml() {
+  const exampleCards = DESK_BUDDY_EXAMPLES.map(
+    (ex) => `
+      <article class="example-card">
+        <div class="example-thumb-wrap" onclick="openLightbox('/assets/desk_buddy_examples/${ex.file}', '${ex.title.replace(/'/g, "\\'")}')">
+          <img src="/assets/desk_buddy_examples/${ex.file}" alt="${ex.title}" loading="eager" />
+          <span class="zoom-hint">Cliquer pour agrandir</span>
+        </div>
+        <div class="example-body">
+          <span class="oled-badge">${ex.badge}</span>
+          <h3>${ex.title}</h3>
+          <p>${ex.desc}</p>
+        </div>
+      </article>
+    `
+  ).join('');
+
   const poseButtons = POSES.map(
     (p, idx) => `
       <button
@@ -85,13 +126,13 @@ function renderIndexHtml() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MeaPet — Aperçu & Assets Alita</title>
+  <title>MeaPet — Exemples Desk Buddy &amp; Assets Alita</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0b0f17;
-      --panel: #121826;
-      --border: #233048;
+      --bg: #000000;
+      --panel: #0b0f17;
+      --border: #1e293b;
       --text: #e6edf7;
       --muted: #93a4bd;
       --accent: #38bdf8;
@@ -106,9 +147,9 @@ function renderIndexHtml() {
       min-height: 100vh;
     }
     .container {
-      max-width: 1120px;
+      max-width: 1180px;
       margin: 0 auto;
-      padding: 28px 20px 44px;
+      padding: 28px 20px 56px;
     }
     header {
       display: flex;
@@ -129,6 +170,120 @@ function renderIndexHtml() {
       margin: 0;
       color: var(--muted);
       font-size: 0.92rem;
+    }
+    .examples-section {
+      margin-bottom: 36px;
+      padding: 20px;
+      border-radius: 16px;
+      background: #05070b;
+      border: 1px solid #162235;
+    }
+    .examples-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .examples-header h2 {
+      margin: 0;
+      font-size: 1.18rem;
+      color: var(--accent);
+    }
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+    }
+    .example-card {
+      background: #000000;
+      border: 1px solid #1f2d44;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .example-thumb-wrap {
+      position: relative;
+      background: #000000;
+      cursor: zoom-in;
+      border-bottom: 1px solid #141e2e;
+    }
+    .example-thumb-wrap img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+    }
+    .zoom-hint {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      background: rgba(0, 0, 0, 0.78);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #e6edf7;
+      font-size: 0.74rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .example-body {
+      padding: 14px 16px 16px;
+    }
+    .oled-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 6px;
+      padding: 3px 8px;
+      margin-bottom: 8px;
+    }
+    .example-body h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+    .example-body p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.94);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 96vw;
+      max-height: 82vh;
+      border-radius: 12px;
+      border: 1px solid #263650;
+    }
+    .lightbox-bar {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--text);
+    }
+    .lightbox-close {
+      background: var(--accent);
+      color: #04101c;
+      border: 0;
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-weight: 600;
+      cursor: pointer;
     }
     .primary-download {
       display: inline-flex;
@@ -248,13 +403,21 @@ function renderIndexHtml() {
   <div class="container">
     <header>
       <div>
-        <h1>MeaPet — Assets Alita (PSD &amp; Sprites PNG)</h1>
-        <p class="subtitle">Aperçu interactif des 6 émotions pour le webhook MeaPet (application Android native Kotlin/Gradle)</p>
+        <h1>MeaPet — Aperçu Desk Buddy (Yeux OLED) &amp; Assets Alita</h1>
+        <p class="subtitle">Comparatif des 3 styles pour le 4ᵉ modèle « Yeux uniquement » sur fond noir #000000</p>
       </div>
       <a class="primary-download" href="/assets/alita_live2d/alita_live2d_layers.psd" download="alita_live2d_layers.psd">
-        Télécharger le PSD (23 calques)
+        Télécharger le PSD Alita (23 calques)
       </a>
     </header>
+
+    <section class="examples-section" aria-label="Exemples Desk Buddy Yeux OLED">
+      <div class="examples-header">
+        <h2>4ᵉ modèle « Yeux uniquement » — 3 styles au choix (fond noir OLED #000000)</h2>
+        <span class="subtitle">Cliquez sur une image pour l’agrandir</span>
+      </div>
+      <div class="examples-grid">${exampleCards}</div>
+    </section>
 
     <div class="grid">
       <div class="card">
@@ -267,7 +430,7 @@ function renderIndexHtml() {
       </div>
 
       <div class="card">
-        <h2>Tester les 6 émotions</h2>
+        <h2>Tester les 6 émotions (Alita 2D)</h2>
         <div class="poses">${poseButtons}</div>
 
         <h2>Télécharger les 6 sprites PNG transparents</h2>
@@ -277,13 +440,32 @@ function renderIndexHtml() {
         <div class="chips">${layerLinks}</div>
 
         <p class="note">
-          L'application Android MeaPet se compile via Gradle (<code>./gradlew :app:assembleDebug</code>). Ce serveur sert uniquement à prévisualiser et télécharger les fichiers PSD/PNG générés.
+          L'application Android MeaPet se compile via Gradle (<code>./gradlew :app:assembleDebug</code>). Ce serveur sert à prévisualiser les concepts Desk Buddy et les fichiers PSD/PNG générés.
         </p>
       </div>
     </div>
   </div>
 
+  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <img id="lightbox-img" src="" alt="Aperçu agrandi" />
+    <div class="lightbox-bar">
+      <strong id="lightbox-title"></strong>
+      <button type="button" class="lightbox-close" onclick="closeLightbox()">Fermer</button>
+    </div>
+  </div>
+
   <script>
+    function openLightbox(src, title) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox-title').textContent = title;
+      document.getElementById('lightbox').classList.add('open');
+    }
+    function closeLightbox(e) {
+      if (!e || e.target.id === 'lightbox' || e.target.classList.contains('lightbox-close')) {
+        document.getElementById('lightbox').classList.remove('open');
+      }
+    }
+
     const buttons = document.querySelectorAll('.pose-btn');
     const img = document.getElementById('preview-img');
     const caption = document.getElementById('preview-caption');
@@ -306,6 +488,26 @@ function renderIndexHtml() {
 </html>`;
 }
 
+function serveStaticFile(rootDir, relPath, res) {
+  const safePath = path.normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '');
+  const fullPath = path.join(rootDir, safePath);
+
+  if (!fullPath.startsWith(rootDir) || !fs.existsSync(fullPath) || fs.statSync(fullPath).isDirectory()) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+    return;
+  }
+
+  const ext = path.extname(fullPath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+  const headers = { 'Content-Type': contentType };
+  if (ext === '.psd') {
+    headers['Content-Disposition'] = `attachment; filename="${path.basename(fullPath)}"`;
+  }
+  res.writeHead(200, headers);
+  fs.createReadStream(fullPath).pipe(res);
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
 
@@ -315,25 +517,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (urlPath.startsWith('/assets/desk_buddy_examples/')) {
+    const relPath = urlPath.replace(/^\/assets\/desk_buddy_examples\//, '');
+    serveStaticFile(EXAMPLES_ROOT, relPath, res);
+    return;
+  }
+
   if (urlPath.startsWith('/assets/alita_live2d/')) {
     const relPath = urlPath.replace(/^\/assets\/alita_live2d\//, '');
-    const safePath = path.normalize(relPath).replace(/^(\.\.(\/|\\|$))+/, '');
-    const fullPath = path.join(ASSETS_ROOT, safePath);
-
-    if (!fullPath.startsWith(ASSETS_ROOT) || !fs.existsSync(fullPath) || fs.statSync(fullPath).isDirectory()) {
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Not found');
-      return;
-    }
-
-    const ext = path.extname(fullPath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    const headers = { 'Content-Type': contentType };
-    if (ext === '.psd') {
-      headers['Content-Disposition'] = `attachment; filename="${path.basename(fullPath)}"`;
-    }
-    res.writeHead(200, headers);
-    fs.createReadStream(fullPath).pipe(res);
+    serveStaticFile(ASSETS_ROOT, relPath, res);
     return;
   }
 

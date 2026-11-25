@@ -99,4 +99,24 @@ class Live2dEmotionTest {
             Live2dEmotion.inferEmotionFromContext("Bonne nuit Alita", "Repose-toi bien")
         )
     }
+
+    @Test
+    fun `inferEmotionFromContext classifies incoming notifications for Desk Buddy eyes`() {
+        assertEquals(
+            "surprise",
+            Live2dEmotion.inferEmotionFromContext("", "Rappel : réunion dans 10 minutes")
+        )
+        assertEquals(
+            "fatigue",
+            Live2dEmotion.inferEmotionFromContext("", "Batterie faible : 12% restants")
+        )
+        assertEquals(
+            "colere",
+            Live2dEmotion.inferEmotionFromContext("", "Erreur critique sur le serveur")
+        )
+        assertEquals(
+            "curiosite",
+            Live2dEmotion.inferEmotionFromContext("", "Nouvelle notification Telegram de Lucas")
+        )
+    }
 }

@@ -279,6 +279,12 @@ internal fun Live2dModelSection(
                                 stringResource(R.string.live2d_alita_builtin_name)
                             model.id == Live2dModelStore.ALITA_FACE_MODEL_ID ->
                                 stringResource(R.string.live2d_alita_face_builtin_name)
+                            model.id == Live2dModelStore.DESK_BUDDY_PIXEL_MODEL_ID ->
+                                stringResource(R.string.live2d_desk_buddy_pixel_name)
+                            model.id == Live2dModelStore.DESK_BUDDY_VECTOR_MODEL_ID ->
+                                stringResource(R.string.live2d_desk_buddy_vector_name)
+                            model.id == Live2dModelStore.DESK_BUDDY_ALITA_EYES_MODEL_ID ->
+                                stringResource(R.string.live2d_desk_buddy_alita_name)
                             model.isBuiltIn ->
                                 stringResource(R.string.live2d_builtin_name)
                             else ->
@@ -293,6 +299,9 @@ internal fun Live2dModelSection(
                         val modeBadgeRes = when (model.renderType) {
                             AvatarRenderType.SPRITE_2D -> R.string.live2d_sprite_2d_badge
                             AvatarRenderType.ALITA_FACE_LIVE2D -> R.string.live2d_face_live2d_badge
+                            AvatarRenderType.DESK_BUDDY_PIXEL,
+                            AvatarRenderType.DESK_BUDDY_VECTOR,
+                            AvatarRenderType.DESK_BUDDY_ALITA_EYES -> R.string.live2d_desk_buddy_oled_badge
                             AvatarRenderType.LIVE2D -> null
                         }
                         if (isActive || modeBadgeRes != null) {

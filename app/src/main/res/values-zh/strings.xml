@@ -132,6 +132,10 @@
     <string name="live2d_sprite_2d_badge">2D 立绘模式 (PNG)</string>
     <string name="live2d_alita_face_builtin_name">Alita 面部 Live2D（内置）</string>
     <string name="live2d_face_live2d_badge">交互式 3D 面部 · 11 组联动表情</string>
+    <string name="live2d_desk_buddy_pixel_name">Desk Buddy 像素 LED 眼（OLED）</string>
+    <string name="live2d_desk_buddy_vector_name">Desk Buddy 矢量柔光眼（OLED）</string>
+    <string name="live2d_desk_buddy_alita_name">Desk Buddy 赛博 Alita 眼（OLED）</string>
+    <string name="live2d_desk_buddy_oled_badge">纯黑省电 OLED 双眼 · 通知联动表情</string>
     <string name="live2d_import_zip">导入 .zip 模型</string>
     <string name="live2d_importing">正在导入模型…</string>
     <string name="live2d_active_badge">使用中</string>

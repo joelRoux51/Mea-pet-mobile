@@ -249,6 +249,9 @@ class FloatingLive2dService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         val (widthDp, heightDp) = when (Live2dManager.getInstance().activeSpec.renderType) {
+            com.meapet.mobile.live2d.AvatarRenderType.DESK_BUDDY_PIXEL,
+            com.meapet.mobile.live2d.AvatarRenderType.DESK_BUDDY_VECTOR,
+            com.meapet.mobile.live2d.AvatarRenderType.DESK_BUDDY_ALITA_EYES -> 196 to 114
             com.meapet.mobile.live2d.AvatarRenderType.ALITA_FACE_LIVE2D -> 156 to 176
             com.meapet.mobile.live2d.AvatarRenderType.SPRITE_2D -> 124 to 218
             com.meapet.mobile.live2d.AvatarRenderType.LIVE2D -> 150 to 218

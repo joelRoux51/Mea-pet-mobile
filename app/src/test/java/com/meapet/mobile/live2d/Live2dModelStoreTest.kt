@@ -57,7 +57,7 @@ class Live2dModelStoreTest {
         assertTrue(File(spec.dirPath, "hiyori.2048/texture_00.png").isFile)
 
         val models = store.listModels()
-        assertEquals(4, models.size)
+        assertEquals(7, models.size)
         assertTrue(models[0].isBuiltIn)
         assertEquals(AvatarRenderType.LIVE2D, models[0].renderType)
         assertTrue(models[1].isBuiltIn)
@@ -67,7 +67,23 @@ class Live2dModelStoreTest {
         assertEquals(Live2dModelStore.ALITA_FACE_MODEL_ID, models[2].id)
         assertEquals(AvatarRenderType.ALITA_FACE_LIVE2D, models[2].renderType)
         assertEquals("alita_face.model3.json", models[2].modelJsonName)
-        assertEquals(spec.id, models[3].id)
+
+        assertTrue(models[3].isBuiltIn)
+        assertEquals(Live2dModelStore.DESK_BUDDY_PIXEL_MODEL_ID, models[3].id)
+        assertEquals(AvatarRenderType.DESK_BUDDY_PIXEL, models[3].renderType)
+        assertTrue(models[3].renderType.isDeskBuddyEyes)
+
+        assertTrue(models[4].isBuiltIn)
+        assertEquals(Live2dModelStore.DESK_BUDDY_VECTOR_MODEL_ID, models[4].id)
+        assertEquals(AvatarRenderType.DESK_BUDDY_VECTOR, models[4].renderType)
+        assertTrue(models[4].renderType.isDeskBuddyEyes)
+
+        assertTrue(models[5].isBuiltIn)
+        assertEquals(Live2dModelStore.DESK_BUDDY_ALITA_EYES_MODEL_ID, models[5].id)
+        assertEquals(AvatarRenderType.DESK_BUDDY_ALITA_EYES, models[5].renderType)
+        assertTrue(models[5].renderType.isDeskBuddyEyes)
+
+        assertEquals(spec.id, models[6].id)
         assertEquals(spec.id, store.findById(spec.id).id)
         assertEquals(
             Live2dModelStore.ALITA_SPRITE_MODEL_ID,
@@ -77,9 +93,21 @@ class Live2dModelStoreTest {
             Live2dModelStore.ALITA_FACE_MODEL_ID,
             store.findById(Live2dModelStore.ALITA_FACE_MODEL_ID).id
         )
+        assertEquals(
+            Live2dModelStore.DESK_BUDDY_PIXEL_MODEL_ID,
+            store.findById(Live2dModelStore.DESK_BUDDY_PIXEL_MODEL_ID).id
+        )
+        assertEquals(
+            Live2dModelStore.DESK_BUDDY_VECTOR_MODEL_ID,
+            store.findById(Live2dModelStore.DESK_BUDDY_VECTOR_MODEL_ID).id
+        )
+        assertEquals(
+            Live2dModelStore.DESK_BUDDY_ALITA_EYES_MODEL_ID,
+            store.findById(Live2dModelStore.DESK_BUDDY_ALITA_EYES_MODEL_ID).id
+        )
 
         assertTrue(store.deleteModel(spec.id))
-        assertEquals(3, store.listModels().size)
+        assertEquals(6, store.listModels().size)
         assertTrue(store.findById(spec.id).isBuiltIn)
     }
 
