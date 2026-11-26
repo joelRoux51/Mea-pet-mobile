@@ -118,5 +118,12 @@ class Live2dEmotionTest {
             "curiosite",
             Live2dEmotion.inferEmotionFromContext("", "Nouvelle notification Telegram de Lucas")
         )
+        assertEquals("rougir", Live2dEmotion.normalizeEmotionName("rougit"))
+        assertEquals("rougir", Live2dEmotion.normalizeEmotionName("blush"))
+        assertEquals("gros_yeux", Live2dEmotion.normalizeEmotionName("gros yeux"))
+        assertEquals(
+            "rougir",
+            Live2dEmotion.inferEmotionFromContext("Je te fais une caresse sur la tête", "")
+        )
     }
 }

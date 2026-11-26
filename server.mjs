@@ -36,10 +36,10 @@ const DESK_BUDDY_EXAMPLES = [
   },
   {
     id: 'option3',
-    title: 'Option 3 — Yeux Cyber-Alita Minimalistes',
-    badge: 'Haute économie · Style anime Alita',
+    title: 'Option 3 — Yeux Manga-Robot (OLED)',
+    badge: 'Haute économie · Style Mecha / Manga',
     file: 'option3_cyber_alita.jpg',
-    desc: 'Uniquement les iris cyan lumineux et cils néon d’Alita isolés sur noir pur #000000, sans visage ni corps.'
+    desc: 'Yeux mecha anguleux avec iris HUD cyan lumineux et sourcils robotiques sur noir pur #000000, sans cils féminins.'
   }
 ];
 

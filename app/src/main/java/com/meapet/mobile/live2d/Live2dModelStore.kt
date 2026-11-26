@@ -143,9 +143,9 @@ class Live2dModelStore(
 
         val DESK_BUDDY_ALITA_EYES_MODEL = Live2dModelSpec(
             id = DESK_BUDDY_ALITA_EYES_MODEL_ID,
-            displayName = "Desk Buddy Cyber-Alita",
-            dirPath = "desk_buddy/alita_eyes/",
-            modelJsonName = "alita_eyes_oled",
+            displayName = "Desk Buddy Manga-Robot",
+            dirPath = "desk_buddy/manga_robot/",
+            modelJsonName = "manga_robot_oled",
             isBuiltIn = true,
             renderType = AvatarRenderType.DESK_BUDDY_ALITA_EYES
         )

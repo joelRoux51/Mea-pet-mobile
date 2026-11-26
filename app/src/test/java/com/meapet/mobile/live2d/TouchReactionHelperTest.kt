@@ -93,4 +93,37 @@ class TouchReactionHelperTest {
         assertEquals(1, tapAfterCooldown.tapCount)
         assertEquals(Live2dEmotion.EMOTION_NORMAL, tapAfterCooldown.emotion)
     }
+
+    @Test
+    fun `desk buddy tap starts surprised then gets serious and angry on repeated taps`() {
+        val tracker = TouchReactionTracker(tapResetMs = 10_000L)
+
+        val tap1 = tracker.onDeskBuddyTap(nowMs = 1_000L, langCode = "fr") { 0 }
+        assertEquals(Live2dEmotion.EMOTION_SURPRISE, tap1.emotion)
+        assertEquals(0, tap1.stage)
+        assertEquals(1, tap1.tapCount)
+
+        val tap2 = tracker.onDeskBuddyTap(nowMs = 2_000L, langCode = "fr") { 0 }
+        assertEquals(Live2dEmotion.EMOTION_SERIEUX, tap2.emotion)
+        assertEquals(1, tap2.stage)
+
+        val tap3 = tracker.onDeskBuddyTap(nowMs = 3_000L, langCode = "fr") { 0 }
+        assertEquals(Live2dEmotion.EMOTION_COLERE, tap3.emotion)
+        assertEquals(2, tap3.stage)
+
+        val tapAfterCooldown = tracker.onDeskBuddyTap(nowMs = 20_000L, langCode = "fr") { 0 }
+        assertEquals(Live2dEmotion.EMOTION_SURPRISE, tapAfterCooldown.emotion)
+        assertEquals(1, tapAfterCooldown.tapCount)
+    }
+
+    @Test
+    fun `caress reaction triggers blush emotion with localized affectionate text`() {
+        val fr = TouchReactionHelper.caressReaction(langCode = "fr") { 0 }
+        assertEquals(Live2dEmotion.EMOTION_ROUGIR, fr.emotion)
+        assertTrue(fr.text.isNotBlank())
+
+        val en = TouchReactionHelper.caressReaction(langCode = "en") { 1 }
+        assertEquals(Live2dEmotion.EMOTION_ROUGIR, en.emotion)
+        assertTrue(en.text.contains("blush", ignoreCase = true))
+    }
 }

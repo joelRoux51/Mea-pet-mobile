@@ -134,7 +134,7 @@
     <string name="live2d_face_live2d_badge">Interactive 3D Face · 11 Linked Expressions</string>
     <string name="live2d_desk_buddy_pixel_name">Desk Buddy Pixel-LED (OLED)</string>
     <string name="live2d_desk_buddy_vector_name">Desk Buddy Vector / EMO (OLED)</string>
-    <string name="live2d_desk_buddy_alita_name">Desk Buddy Cyber-Alita Eyes (OLED)</string>
+    <string name="live2d_desk_buddy_alita_name">Desk Buddy Manga-Robot (OLED)</string>
     <string name="live2d_desk_buddy_oled_badge">Pure Black OLED Eyes · Notification Reactions</string>
     <string name="live2d_import_zip">Import .zip model</string>
     <string name="live2d_importing">Importing model…</string>

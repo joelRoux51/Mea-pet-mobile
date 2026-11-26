@@ -338,6 +338,7 @@ class MainActivity : ComponentActivity() {
                                     MotionEvent.ACTION_DOWN -> Live2dDelegate.getInstance().onTouchBegan(x, y)
                                     MotionEvent.ACTION_UP -> Live2dDelegate.getInstance().onTouchEnd(x, y)
                                     MotionEvent.ACTION_MOVE -> Live2dDelegate.getInstance().onTouchMoved(x, y)
+                                    MotionEvent.ACTION_CANCEL -> Live2dDelegate.getInstance().onTouchCancelled()
                                 }
                             } catch (_: Exception) {}
                         }

@@ -247,6 +247,10 @@ class Live2dDelegate private constructor() {
     fun onTouchBegan(x: Float, y: Float) {
         mouseX = x; mouseY = y
         touchDownX = x; touchDownY = y; touchDownTime = System.currentTimeMillis()
+        lastMoveX = x; lastMoveY = y
+        cumulativeDragDist = 0f
+        petTriggeredThisStroke = false
+        lastPetRefreshMs = 0L
         isCaptured = true
         if (windowWidth > 0 && windowHeight > 0) {
             Live2dManager.getInstance().onDrag(
@@ -257,13 +261,44 @@ class Live2dDelegate private constructor() {
     }
 
     fun onTouchMoved(x: Float, y: Float) {
+        val stepDx = x - lastMoveX
+        val stepDy = y - lastMoveY
+        lastMoveX = x
+        lastMoveY = y
         mouseX = x; mouseY = y
         if (isCaptured && windowWidth > 0 && windowHeight > 0) {
             Live2dManager.getInstance().onDrag(
                 ((x / windowWidth) * 2f - 1f).coerceIn(-1f, 1f),
                 (-((y / windowHeight) * 2f - 1f)).coerceIn(-1f, 1f)
             )
+            val renderType = Live2dManager.getInstance().activeSpec.renderType
+            val isDeskBuddy = renderType.isDeskBuddyEyes
+            val insideTouchArea = if (isDeskBuddy) y < touchExclusionTopY else !(immersiveMode && y >= touchExclusionTopY)
+            if (zoneTouchEnabled && insideTouchArea) {
+                cumulativeDragDist += kotlin.math.sqrt((stepDx * stepDx + stepDy * stepDy).toDouble()).toFloat()
+                val now = System.currentTimeMillis()
+                val elapsed = now - touchDownTime
+                if (!petTriggeredThisStroke && cumulativeDragDist >= PET_DISTANCE_THRESHOLD_PX && elapsed >= PET_DURATION_THRESHOLD_MS) {
+                    petTriggeredThisStroke = true
+                    lastPetRefreshMs = now
+                    touchReactionTracker.reset()
+                    val ctx = _appContext ?: _activity
+                    val langCode = TouchReactionHelper.resolveLanguageCode(ctx)
+                    val reaction = TouchReactionHelper.caressReaction(langCode) { bound -> secureRandom.nextInt(bound) }
+                    Live2dManager.getInstance().triggerTapEmotion(reaction.emotion)
+                    Live2dManager.emitTapMessage(reaction.text)
+                } else if (petTriggeredThisStroke && now - lastPetRefreshMs >= 1800L) {
+                    lastPetRefreshMs = now
+                    Live2dManager.getInstance().triggerTapEmotion(Live2dEmotion.EMOTION_ROUGIR)
+                }
+            }
         }
+    }
+
+    fun onTouchCancelled() {
+        isCaptured = false
+        petTriggeredThisStroke = false
+        Live2dManager.getInstance().onDrag(0.0f, 0.0f)
     }
 
     private val secureRandom = SecureRandom()
@@ -274,6 +309,11 @@ class Live2dDelegate private constructor() {
 
     private var touchDownX = 0f
     private var touchDownY = 0f
+    private var lastMoveX = 0f
+    private var lastMoveY = 0f
+    private var cumulativeDragDist = 0f
+    private var petTriggeredThisStroke = false
+    private var lastPetRefreshMs = 0L
     private var touchDownTime = 0L
     private val touchReactionTracker = TouchReactionTracker()
 
@@ -322,18 +362,29 @@ class Live2dDelegate private constructor() {
         val nx = (x / windowWidth) * 2f - 1f
         val ny = -((y / windowHeight) * 2f - 1f)
 
+        val ctx = _appContext ?: _activity
+        val langCode = TouchReactionHelper.resolveLanguageCode(ctx)
+
+        // Desk Buddy reacts to screen taps anywhere above the chat panel (Tap 1: surprised, repeated: angry)
+        if (isDeskBuddy) {
+            val reaction = touchReactionTracker.onDeskBuddyTap(
+                nowMs = System.currentTimeMillis(),
+                langCode = langCode,
+                picker = { bound -> secureRandom.nextInt(bound) }
+            )
+            return reaction to ""
+        }
+
         val isAlita = renderType.isAlitaSpriteFamily
         val isAlitaFace = renderType == AvatarRenderType.ALITA_FACE_LIVE2D
         if (isImmersive) {
             when {
-                isDeskBuddy -> if (nx < -0.92f || nx > 0.92f || ny < -0.35f || ny > 0.65f) return null
                 isAlitaFace -> if (nx < -0.88f || nx > 0.88f || ny < -0.72f || ny > 0.82f) return null
                 isAlita -> if (nx < -0.92f || nx > 0.92f || ny < -0.96f || ny > 0.96f) return null
                 else -> if (nx < -0.78f || nx > 0.78f || ny < -0.92f || ny > 0.92f) return null
             }
         } else {
             when {
-                isDeskBuddy -> if (nx < -0.88f || nx > 0.88f || ny < 0.26f || ny > 0.88f) return null
                 isAlitaFace -> if (nx < -0.82f || nx > 0.82f || ny < -0.72f || ny > 0.72f) return null
                 isAlita -> if (nx < -0.68f || nx > 0.68f || ny < -0.78f || ny > 0.72f) return null
                 else -> if (nx < -0.45f || nx > 0.45f || ny < -0.44f || ny > 0.66f) return null
@@ -341,8 +392,6 @@ class Live2dDelegate private constructor() {
         }
 
         val splitY = when {
-            isDeskBuddy && isImmersive -> 0.12f
-            isDeskBuddy -> 0.58f
             isAlitaFace -> 0.08f
             isImmersive && isAlita -> 0.22f
             isImmersive -> 0.05f
@@ -361,13 +410,11 @@ class Live2dDelegate private constructor() {
         val files = vp.listVoices()
         if (files.isEmpty()) return null
 
-        val ctx = _appContext ?: _activity
-        val langCode = TouchReactionHelper.resolveLanguageCode(ctx)
         val reaction = touchReactionTracker.onTap(
             availableFiles = files,
             nowMs = System.currentTimeMillis(),
             langCode = langCode,
-            isAlita = isAlita || isDeskBuddy,
+            isAlita = isAlita,
             picker = { bound -> secureRandom.nextInt(bound) }
         ) ?: return null
 
@@ -376,19 +423,25 @@ class Live2dDelegate private constructor() {
 
     fun onTouchEnd(x: Float, y: Float) {
         mouseX = x; mouseY = y
+        val wasPetting = petTriggeredThisStroke
         isCaptured = false
+        petTriggeredThisStroke = false
         Live2dManager.getInstance().onDrag(0.0f, 0.0f)
+
+        if (wasPetting) return
 
         // 检测轻触 → 分区反馈（仅在聊天页启用，防止设置页穿透）
         if (zoneTouchEnabled && isTap(x, y)) {
             val zone = detectZone(x, y)
             if (zone != null) {
                 val (reaction, dir) = zone
-                // 互斥：TTS 正在朗读时先停掉，再播触摸语音
-                if (ttsPlayingChecker?.invoke() == true) ttsStopper?.invoke()
-                // 先停止所有正在播放的语音（包括其他分区的），再播放新语音
-                stopAllVoices()
-                ensureVoicePlayer(dir)?.play(reaction.filename)
+                if (dir.isNotEmpty() && reaction.filename.isNotEmpty()) {
+                    // 互斥：TTS 正在朗读时先停掉，再播触摸语音
+                    if (ttsPlayingChecker?.invoke() == true) ttsStopper?.invoke()
+                    // 先停止所有正在播放的语音（包括其他分区的），再播放新语音
+                    stopAllVoices()
+                    ensureVoicePlayer(dir)?.play(reaction.filename)
+                }
                 // Escalate avatar expression based on repeated taps
                 Live2dManager.getInstance().triggerTapEmotion(reaction.emotion)
                 // Broadcast translated message bubble to ChatViewModel
@@ -396,4 +449,7 @@ class Live2dDelegate private constructor() {
             }
         }
     }
+
+    private val PET_DISTANCE_THRESHOLD_PX = 110f
+    private val PET_DURATION_THRESHOLD_MS = 150L
 }

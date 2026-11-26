@@ -24,6 +24,8 @@ object Live2dEmotion {
     const val EMOTION_SURPRISE = "surprise"
     const val EMOTION_CURIOSITE = "curiosite"
     const val EMOTION_CLIN_DOEIL = "clin_doeil"
+    const val EMOTION_ROUGIR = "rougir"
+    const val EMOTION_GROS_YEUX = "gros_yeux"
     const val EMOTION_NORMAL = "normal"
 
     private val EMOTION_TAG_REGEX = Regex(
@@ -84,6 +86,13 @@ object Live2dEmotion {
             "clin_doeil", "clin_d_oeil", "wink", "complicite", "complicité",
             "complice", "parfait", "pret", "prêt"
         ),
+        EMOTION_ROUGIR to listOf(
+            "rougir", "rougit", "blush", "blushing", "shy", "timide",
+            "embarrasse", "embarrassed", "caresse", "pet", "headpat", "flushed", "mignon"
+        ),
+        EMOTION_GROS_YEUX to listOf(
+            "gros_yeux", "wide_eyes", "big_eyes", "ecarquille", "écarquillé", "starry"
+        ),
         EMOTION_NORMAL to listOf(
             "normal", "default", "neutral", "neutre", "idle", "reset",
             "defaut", "défaut", "默认", "正常"
@@ -123,6 +132,9 @@ object Live2dEmotion {
     private val WINK_KEYWORDS = listOf(
         "clin d'oeil", "c'est note", "voix changee", "vitesse reglee", "avec plaisir"
     )
+    private val AFFECTION_KEYWORDS = listOf(
+        "caresse", "rougit", "rougir", "tu es mignon", "t'es mignon", "je t'aime", "adorable"
+    )
     private val GREETING_KEYWORDS = listOf(
         "coucou", "bonjour", "salut", "hello", "bonsoir"
     )
@@ -142,6 +154,7 @@ object Live2dEmotion {
             SURPRISE_KEYWORDS.any { combined.contains(it) } -> EMOTION_SURPRISE
             SLEEP_KEYWORDS.any { combined.contains(it) } -> EMOTION_FATIGUE
             STRETCH_KEYWORDS.any { combined.contains(it) } -> EMOTION_ETIREMENT
+            AFFECTION_KEYWORDS.any { combined.contains(it) } -> EMOTION_ROUGIR
             MALICE_KEYWORDS.any { combined.contains(it) } -> EMOTION_MALICE
             CURIOSITY_KEYWORDS.any { combined.contains(it) } -> EMOTION_CURIOSITE
             WINK_KEYWORDS.any { combined.contains(it) } -> EMOTION_CLIN_DOEIL

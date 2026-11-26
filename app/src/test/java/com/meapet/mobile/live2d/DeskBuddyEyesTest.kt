@@ -91,9 +91,35 @@ class DeskBuddyEyesTest {
         val doubleBlink = DeskBuddyEyesRenderer.computeBlinkWeight(2L * 3800L + 340L + 95L, Live2dEmotion.EMOTION_NORMAL)
         assertEquals(1.0f, doubleBlink, 0.05f)
 
-        // Happy / calm closed eyes do not blink
+        // Happy / calm / blush closed eyes do not blink
         assertEquals(0f, DeskBuddyEyesRenderer.computeBlinkWeight(95L, Live2dEmotion.EMOTION_JOIE), 0.001f)
         assertEquals(0f, DeskBuddyEyesRenderer.computeBlinkWeight(95L, Live2dEmotion.EMOTION_CALME), 0.001f)
+        assertEquals(0f, DeskBuddyEyesRenderer.computeBlinkWeight(95L, Live2dEmotion.EMOTION_ROUGIR), 0.001f)
+    }
+
+    @Test
+    fun `resolveEyePreset handles blush and wide eyes`() {
+        val blush = DeskBuddyEyesRenderer.resolveEyePreset(Live2dEmotion.EMOTION_ROUGIR)
+        assertEquals(DeskBuddyEyeShape.BLUSH, blush.shape)
+        assertEquals(DeskBuddyBadge.HEART, blush.badge)
+        assertTrue(blush.hasBlush)
+
+        val wide = DeskBuddyEyesRenderer.resolveEyePreset(Live2dEmotion.EMOTION_GROS_YEUX)
+        assertEquals(DeskBuddyEyeShape.WIDE_EYES, wide.shape)
+        assertEquals(DeskBuddyBadge.SPARKLE, wide.badge)
+        assertFalse(wide.hasBlush)
+    }
+
+    @Test
+    fun `computeIdleExpression cycles wink wide eyes and sleepy when normal and yields otherwise`() {
+        assertEquals(Live2dEmotion.EMOTION_NORMAL, DeskBuddyEyesRenderer.computeIdleExpression(1_000L, Live2dEmotion.EMOTION_NORMAL))
+        assertEquals(Live2dEmotion.EMOTION_CLIN_DOEIL, DeskBuddyEyesRenderer.computeIdleExpression(6_500L, Live2dEmotion.EMOTION_NORMAL))
+        assertEquals(Live2dEmotion.EMOTION_GROS_YEUX, DeskBuddyEyesRenderer.computeIdleExpression(14_000L, Live2dEmotion.EMOTION_NORMAL))
+        assertEquals(Live2dEmotion.EMOTION_FATIGUE, DeskBuddyEyesRenderer.computeIdleExpression(22_000L, Live2dEmotion.EMOTION_NORMAL))
+
+        // Active non-normal emotion is never overridden by idle cycle
+        assertEquals(Live2dEmotion.EMOTION_ROUGIR, DeskBuddyEyesRenderer.computeIdleExpression(6_500L, Live2dEmotion.EMOTION_ROUGIR))
+        assertEquals(Live2dEmotion.EMOTION_COLERE, DeskBuddyEyesRenderer.computeIdleExpression(22_000L, Live2dEmotion.EMOTION_COLERE))
     }
 
     @Test

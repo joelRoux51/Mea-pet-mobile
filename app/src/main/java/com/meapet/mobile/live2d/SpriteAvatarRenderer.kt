@@ -1498,11 +1498,11 @@ class SpriteAvatarRenderer {
         }
 
         fun resolveSupportedEmotion(rawEmotion: String): String {
-            val normalized = Live2dEmotion.normalizeEmotionName(rawEmotion)
-            return if (normalized in SUPPORTED_EMOTIONS) {
-                normalized
-            } else {
-                Live2dEmotion.EMOTION_NORMAL
+            return when (val normalized = Live2dEmotion.normalizeEmotionName(rawEmotion)) {
+                Live2dEmotion.EMOTION_ROUGIR -> Live2dEmotion.EMOTION_JOIE
+                Live2dEmotion.EMOTION_GROS_YEUX -> Live2dEmotion.EMOTION_SURPRISE
+                in SUPPORTED_EMOTIONS -> normalized
+                else -> Live2dEmotion.EMOTION_NORMAL
             }
         }
     }

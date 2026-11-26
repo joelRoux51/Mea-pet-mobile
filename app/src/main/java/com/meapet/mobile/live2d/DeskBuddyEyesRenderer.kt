@@ -41,13 +41,16 @@ enum class DeskBuddyBadge {
     ALERT,
     SLEEP_ZZ,
     SPARKLE,
-    MESSAGE_BUBBLE
+    MESSAGE_BUBBLE,
+    HEART
 }
 
 enum class DeskBuddyEyeShape {
     NORMAL,
     CURIOUS,
     ALERT,
+    WIDE_EYES,
+    BLUSH,
     HAPPY_ARC,
     CALM_CLOSED,
     SLEEPY,
@@ -63,6 +66,7 @@ data class DeskBuddyEyePreset(
     val badge: DeskBuddyBadge,
     val isAlertColor: Boolean = false,
     val isDimmed: Boolean = false,
+    val hasBlush: Boolean = false,
     val brightness: Float = 1.0f,
     val openLeft: Float = 1.0f,
     val openRight: Float = 1.0f
@@ -188,7 +192,8 @@ class DeskBuddyEyesRenderer {
         val dtSec = if (lastFrameMs > 0L) ((nowMs - lastFrameMs).coerceIn(1L, 80L) / 1000f) else 0.016f
         lastFrameMs = nowMs
 
-        val preset = resolveEyePreset(currentEmotion)
+        val effectiveEmotion = computeIdleExpression(nowMs, currentEmotion)
+        val preset = resolveEyePreset(effectiveEmotion)
         val idleGaze = computeIdleGaze(nowMs, preset.canonicalEmotion)
         val hasDrag = abs(dragX) > 0.02f || abs(dragY) > 0.02f
         val targetX = if (hasDrag) dragX.coerceIn(-1f, 1f) else idleGaze.x
@@ -323,9 +328,13 @@ class DeskBuddyEyesRenderer {
             DeskBuddyStyle.VECTOR_SMOOTH -> drawVectorSmoothEyes(
                 cvs, preset, gazeX, gazeY, leftOpen, rightOpen, primaryColor, coreColor, pulse
             )
-            DeskBuddyStyle.ALITA_CYBER_EYES -> drawCyberAlitaEyes(
+            DeskBuddyStyle.ALITA_CYBER_EYES -> drawMangaRobotEyes(
                 cvs, preset, gazeX, gazeY, leftOpen, rightOpen, primaryColor, coreColor, pulse
             )
+        }
+
+        if (preset.hasBlush) {
+            drawBlushCheeks(cvs, style, pulse)
         }
 
         drawNotificationBadge(cvs, preset.badge, primaryColor, coreColor, pulse)
@@ -444,6 +453,19 @@ class DeskBuddyEyesRenderer {
                     DeskBuddyEyeShape.HAPPY_ARC -> {
                         val arcY = -0.35f + 0.95f * nx * nx
                         if (abs(ny - arcY) <= 0.28f && abs(nx) <= 0.92f) state = 2
+                    }
+                    DeskBuddyEyeShape.BLUSH -> {
+                        val arcY = -0.25f + 0.85f * nx * nx
+                        if (abs(ny - arcY) <= 0.30f && abs(nx) <= 0.94f) {
+                            state = if (abs(ny - arcY) <= 0.14f) 3 else 2
+                        }
+                    }
+                    DeskBuddyEyeShape.WIDE_EYES -> {
+                        val ellipse = (nx * nx) / 1.15f + (ny * ny) / 1.15f
+                        if (ellipse <= 1.05f) {
+                            val pDist = ((c - pupilCx) * (c - pupilCx) + (r - pupilCy) * (r - pupilCy))
+                            state = if (pDist <= 1.25f) 0 else if (pDist <= 3.6f && r < pupilCy) 3 else 2
+                        }
                     }
                     DeskBuddyEyeShape.CALM_CLOSED -> {
                         val arcY = 0.28f - 0.58f * nx * nx
@@ -607,13 +629,13 @@ class DeskBuddyEyesRenderer {
         coreColor: Int,
         pulse: Float
     ) {
-        val halfW = 66f * scale
-        val halfH = 66f * scale
+        val halfW = (if (shape == DeskBuddyEyeShape.WIDE_EYES) 74f else 66f) * scale
+        val halfH = (if (shape == DeskBuddyEyeShape.WIDE_EYES) 76f else 66f) * scale
 
         glowPaint.color = Color.argb(90, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
 
         when (shape) {
-            DeskBuddyEyeShape.HAPPY_ARC -> {
+            DeskBuddyEyeShape.HAPPY_ARC, DeskBuddyEyeShape.BLUSH -> {
                 drawSmoothArcEye(cvs, cx, cy + 8f, halfW * 1.02f, 34f, upward = true, primaryColor, coreColor, thickness = 20f)
                 return
             }
@@ -679,16 +701,21 @@ class DeskBuddyEyesRenderer {
         cvs.drawRoundRect(rectTmp, 38f * scale, 38f * scale, solidPaint)
         solidPaint.shader = null
 
-        // Pupil cutout moving with gaze
+        // Pupil cutout moving with gaze (smaller pinpoint pupil when making big wide eyes)
         val pupilX = cx + gazeX * 22f * scale
         val pupilY = cy - gazeY * 14f * scale
+        val pupilHalfW = if (shape == DeskBuddyEyeShape.WIDE_EYES) 12f else 18f
+        val pupilHalfH = if (shape == DeskBuddyEyeShape.WIDE_EYES) 14f else 24f
         solidPaint.color = Color.rgb(6, 16, 28)
-        rectTmp.set(pupilX - 18f * scale, pupilY - 24f * scale * openFactor, pupilX + 18f * scale, pupilY + 24f * scale * openFactor)
+        rectTmp.set(pupilX - pupilHalfW * scale, pupilY - pupilHalfH * scale * openFactor, pupilX + pupilHalfW * scale, pupilY + pupilHalfH * scale * openFactor)
         cvs.drawRoundRect(rectTmp, 16f, 16f, solidPaint)
 
         // Crisp specular highlight dot
-        solidPaint.color = Color.argb(230, 255, 255, 255)
-        cvs.drawCircle(pupilX - 9f * scale, pupilY - 12f * scale * openFactor, 6.5f * scale, solidPaint)
+        solidPaint.color = Color.argb(235, 255, 255, 255)
+        cvs.drawCircle(pupilX - 9f * scale, pupilY - 12f * scale * openFactor, if (shape == DeskBuddyEyeShape.WIDE_EYES) 8.5f * scale else 6.5f * scale, solidPaint)
+        if (shape == DeskBuddyEyeShape.WIDE_EYES) {
+            cvs.drawCircle(pupilX + 10f * scale, pupilY + 9f * scale * openFactor, 4.2f * scale, solidPaint)
+        }
 
         // Heavy sleepy / focused top eyelid cover
         if (shape == DeskBuddyEyeShape.SLEEPY || shape == DeskBuddyEyeShape.FOCUSED || shape == DeskBuddyEyeShape.ANGRY) {
@@ -738,10 +765,10 @@ class DeskBuddyEyesRenderer {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // Option 3: Yeux Cyber-Alita Minimalistes (Iris lumineux & cils néon sur noir)
+    // Option 3: Yeux Manga-Robot OLED (cadres mecha géométriques & iris HUD sur noir)
     // ─────────────────────────────────────────────────────────────────────────────
 
-    private fun drawCyberAlitaEyes(
+    private fun drawMangaRobotEyes(
         cvs: Canvas,
         preset: DeskBuddyEyePreset,
         gazeX: Float,
@@ -754,9 +781,9 @@ class DeskBuddyEyesRenderer {
     ) {
         val leftCx = TEX_WIDTH * 0.32f
         val rightCx = TEX_WIDTH * 0.68f
-        val eyeCy = TEX_HEIGHT * 0.51f
+        val eyeCy = TEX_HEIGHT * 0.52f
 
-        drawSingleCyberAlitaEye(
+        drawSingleMangaRobotEye(
             cvs = cvs,
             cx = leftCx,
             cy = eyeCy,
@@ -769,7 +796,7 @@ class DeskBuddyEyesRenderer {
             coreColor = coreColor,
             pulse = pulse
         )
-        drawSingleCyberAlitaEye(
+        drawSingleMangaRobotEye(
             cvs = cvs,
             cx = rightCx,
             cy = eyeCy,
@@ -784,7 +811,7 @@ class DeskBuddyEyesRenderer {
         )
     }
 
-    private fun drawSingleCyberAlitaEye(
+    private fun drawSingleMangaRobotEye(
         cvs: Canvas,
         cx: Float,
         cy: Float,
@@ -798,7 +825,10 @@ class DeskBuddyEyesRenderer {
         pulse: Float
     ) {
         val dir = if (isLeft) -1f else 1f
-        val eyeHalfW = 92f
+        val eyeHalfW = if (shape == DeskBuddyEyeShape.WIDE_EYES || shape == DeskBuddyEyeShape.ALERT) 88f else 84f
+
+        // Bold angular manga mecha brow armor above each eye (no feminine lashes)
+        drawMechaBrow(cvs, cx, cy, eyeHalfW, isLeft, shape, openFactor, primaryColor, coreColor)
 
         val closedOnly = shape == DeskBuddyEyeShape.CALM_CLOSED ||
             (shape == DeskBuddyEyeShape.WINK_LEFT && isLeft) ||
@@ -806,144 +836,265 @@ class DeskBuddyEyesRenderer {
 
         if (closedOnly) {
             val dimAlpha = if (shape == DeskBuddyEyeShape.CALM_CLOSED) 185 else 255
-            val lashColor = Color.argb(dimAlpha, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
-            val curveUp = shape == DeskBuddyEyeShape.HAPPY_ARC || shape == DeskBuddyEyeShape.WINK_LEFT
+            val arcColor = Color.argb(dimAlpha, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
             pathTmp.reset()
-            pathTmp.moveTo(cx - eyeHalfW * 0.85f, cy)
-            pathTmp.quadTo(
-                cx,
-                if (curveUp) cy - 30f else cy + 24f,
-                cx + eyeHalfW * 0.85f,
-                cy - (if (dir > 0f) 4f else 0f)
-            )
+            when {
+                shape == DeskBuddyEyeShape.WINK_LEFT && isLeft -> {
+                    // Crisp dynamic manga mecha '>' wink
+                    pathTmp.moveTo(cx - eyeHalfW * 0.68f, cy - 22f)
+                    pathTmp.lineTo(cx + eyeHalfW * 0.52f, cy + 2f)
+                    pathTmp.lineTo(cx - eyeHalfW * 0.68f, cy + 24f)
+                }
+                shape == DeskBuddyEyeShape.HAPPY_ARC || shape == DeskBuddyEyeShape.BLUSH -> {
+                    pathTmp.moveTo(cx - eyeHalfW * 0.72f, cy + 12f)
+                    pathTmp.lineTo(cx, cy - 24f)
+                    pathTmp.lineTo(cx + eyeHalfW * 0.72f, cy + 12f)
+                }
+                else -> {
+                    pathTmp.moveTo(cx - eyeHalfW * 0.76f, cy + 4f)
+                    pathTmp.lineTo(cx + eyeHalfW * 0.76f, cy + 4f)
+                }
+            }
             glowStrokePaint.color = Color.argb(120, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
-            glowStrokePaint.strokeWidth = 11f
+            glowStrokePaint.strokeWidth = 14f
             cvs.drawPath(pathTmp, glowStrokePaint)
-            strokePaint.color = lashColor
-            strokePaint.strokeWidth = 5.5f
+            strokePaint.color = arcColor
+            strokePaint.strokeWidth = 7.5f
             cvs.drawPath(pathTmp, strokePaint)
-
-            // Outer cyber wing lashes
-            val outerX = cx + dir * eyeHalfW * 0.85f
-            strokePaint.strokeWidth = 3.2f
-            cvs.drawLine(outerX, cy, outerX + dir * 20f, cy - 10f, strokePaint)
-            cvs.drawLine(outerX - dir * 8f, cy + 4f, outerX + dir * 12f, cy - 18f, strokePaint)
+            strokePaint.color = coreColor
+            strokePaint.strokeWidth = 2.8f
+            cvs.drawPath(pathTmp, strokePaint)
             return
         }
 
         val heightFactor = when (shape) {
-            DeskBuddyEyeShape.SLEEPY -> 0.56f
-            DeskBuddyEyeShape.FOCUSED, DeskBuddyEyeShape.ANGRY -> 0.72f
-            DeskBuddyEyeShape.ALERT -> 1.08f
-            DeskBuddyEyeShape.SLY_MALICE -> if (isLeft) 0.62f else 0.96f
+            DeskBuddyEyeShape.SLEEPY -> 0.52f
+            DeskBuddyEyeShape.FOCUSED, DeskBuddyEyeShape.ANGRY -> 0.68f
+            DeskBuddyEyeShape.WIDE_EYES, DeskBuddyEyeShape.ALERT -> 1.18f
+            DeskBuddyEyeShape.SLY_MALICE -> if (isLeft) 0.60f else 0.96f
+            DeskBuddyEyeShape.CURIOUS -> if (isLeft) 1.06f else 0.88f
             else -> 1.0f
         }
-        val halfH = max(14f, 54f * openFactor * heightFactor)
+        val halfH = max(14f, 52f * openFactor * heightFactor)
 
-        // Almond sclera clipping silhouette
+        // Sharp angular hexagonal/octagonal anime mecha eye socket
+        val innerEdge = -dir * eyeHalfW * 0.84f
+        val outerEdge = dir * eyeHalfW * 0.92f
+        val topFlatInner = -dir * eyeHalfW * 0.42f
+        val topFlatOuter = dir * eyeHalfW * 0.56f
+        val botFlatInner = -dir * eyeHalfW * 0.46f
+        val botFlatOuter = dir * eyeHalfW * 0.48f
+
         val eyePath = Path().apply {
-            moveTo(cx - eyeHalfW, cy + 4f)
-            cubicTo(cx - eyeHalfW * 0.45f, cy - halfH * 1.18f, cx + eyeHalfW * 0.45f, cy - halfH * 1.18f, cx + eyeHalfW, cy + 2f)
-            cubicTo(cx + eyeHalfW * 0.48f, cy + halfH * 0.95f, cx - eyeHalfW * 0.48f, cy + halfH * 0.95f, cx - eyeHalfW, cy + 4f)
+            moveTo(innerEdge, cy + 6f)
+            lineTo(topFlatInner, cy - halfH)
+            lineTo(topFlatOuter, cy - halfH * 0.84f)
+            lineTo(outerEdge, cy - 2f)
+            lineTo(botFlatOuter, cy + halfH * 0.88f)
+            lineTo(botFlatInner, cy + halfH * 0.96f)
             close()
         }
 
         cvs.save()
         if (shape == DeskBuddyEyeShape.ANGRY) {
-            cvs.rotate(if (isLeft) 10f else -10f, cx, cy)
+            cvs.rotate(if (isLeft) 11f else -11f, cx, cy)
         }
 
-        // Subtle cool translucent sclera inside the pure black backdrop
+        // Deep dark cyber-lens interior + luminous HUD iris clipped inside mecha frame
         cvs.save()
         cvs.clipPath(eyePath)
-        solidPaint.color = Color.rgb(18, 30, 44)
+        solidPaint.color = if (shape == DeskBuddyEyeShape.ALERT || shape == DeskBuddyEyeShape.WIDE_EYES) {
+            Color.rgb(16, 36, 56)
+        } else {
+            Color.rgb(8, 20, 34)
+        }
         cvs.drawPath(eyePath, solidPaint)
 
-        // Iris + cyber tech rings moving left-to-right with gaze
+        // Glowing HUD iris & targeting reticle tracking left-to-right gaze
         val irisX = cx + gazeX * 26f
         val irisY = cy - gazeY * 14f
-        val irisR = if (shape == DeskBuddyEyeShape.ALERT) 36f else 42f
+        val irisR = when (shape) {
+            DeskBuddyEyeShape.WIDE_EYES -> 44f
+            DeskBuddyEyeShape.ALERT -> 36f
+            else -> 39f
+        }
 
-        glowPaint.color = Color.argb(120, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
-        cvs.drawCircle(irisX, irisY, irisR + 6f, glowPaint)
+        glowPaint.color = Color.argb(130, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+        cvs.drawCircle(irisX, irisY, irisR + 8f, glowPaint)
 
         solidPaint.shader = RadialGradient(
             irisX,
             irisY,
             irisR,
-            intArrayOf(coreColor, primaryColor, Color.rgb(12, 62, 92)),
-            floatArrayOf(0.18f, 0.65f, 1.0f),
+            intArrayOf(coreColor, primaryColor, Color.rgb(10, 56, 86)),
+            floatArrayOf(0.20f, 0.68f, 1.0f),
             Shader.TileMode.CLAMP
         )
         cvs.drawCircle(irisX, irisY, irisR, solidPaint)
         solidPaint.shader = null
 
-        // Tech iris ring segments
-        strokePaint.color = Color.argb(180, 255, 255, 255)
-        strokePaint.strokeWidth = 2.4f
-        rectTmp.set(irisX - irisR * 0.68f, irisY - irisR * 0.68f, irisX + irisR * 0.68f, irisY + irisR * 0.68f)
-        cvs.drawArc(rectTmp, 20f + pulse * 25f, 110f, false, strokePaint)
-        cvs.drawArc(rectTmp, 200f + pulse * 25f, 95f, false, strokePaint)
+        // Segmented HUD scanner ring + 4 orthogonal mecha reticle ticks
+        strokePaint.color = Color.argb(205, 255, 255, 255)
+        strokePaint.strokeWidth = 2.6f
+        rectTmp.set(irisX - irisR * 0.72f, irisY - irisR * 0.72f, irisX + irisR * 0.72f, irisY + irisR * 0.72f)
+        cvs.drawArc(rectTmp, -35f + pulse * 24f, 115f, false, strokePaint)
+        cvs.drawArc(rectTmp, 145f + pulse * 24f, 115f, false, strokePaint)
 
-        // Pupil + sharp white anime specular highlights
-        solidPaint.color = Color.rgb(4, 10, 18)
-        val pupilR = if (shape == DeskBuddyEyeShape.ALERT) 14f else 17f
+        strokePaint.color = coreColor
+        strokePaint.strokeWidth = 2.0f
+        cvs.drawLine(irisX - irisR * 0.92f, irisY, irisX - irisR * 0.56f, irisY, strokePaint)
+        cvs.drawLine(irisX + irisR * 0.56f, irisY, irisX + irisR * 0.92f, irisY, strokePaint)
+        cvs.drawLine(irisX, irisY - irisR * 0.92f, irisX, irisY - irisR * 0.56f, strokePaint)
+        cvs.drawLine(irisX, irisY + irisR * 0.56f, irisX, irisY + irisR * 0.92f, strokePaint)
+
+        // Pinpoint mechanical aperture pupil (extra small for wide eyes / shock!)
+        solidPaint.color = Color.rgb(3, 8, 16)
+        val pupilR = when (shape) {
+            DeskBuddyEyeShape.ALERT -> 10f
+            DeskBuddyEyeShape.WIDE_EYES -> 12f
+            else -> 16f
+        }
         cvs.drawCircle(irisX, irisY, pupilR, solidPaint)
 
+        // Crisp manga specular highlights (bold square + dot)
         solidPaint.color = Color.WHITE
-        cvs.drawCircle(irisX - 13f, irisY - 14f, 7.5f, solidPaint)
-        cvs.drawCircle(irisX + 12f, irisY + 11f, 3.8f, solidPaint)
+        rectTmp.set(irisX - 18f, irisY - 19f, irisX - 6f, irisY - 7f)
+        cvs.drawRoundRect(rectTmp, 3f, 3f, solidPaint)
+        cvs.drawCircle(irisX + 12f, irisY + 11f, if (shape == DeskBuddyEyeShape.WIDE_EYES) 5.5f else 3.8f, solidPaint)
 
-        // Happy curved shimmer crescent inside bottom of iris
-        if (shape == DeskBuddyEyeShape.HAPPY_ARC) {
-            solidPaint.color = Color.argb(150, 220, 252, 255)
-            cvs.drawCircle(irisX, irisY + 20f, 16f, solidPaint)
-        }
-
-        // Sleepy eyelid drape across top half
+        // Mechanical upper shutter plate for SLEEPY / BLUSH warmth
         if (shape == DeskBuddyEyeShape.SLEEPY) {
-            solidPaint.color = Color.argb(225, 0, 0, 0)
+            solidPaint.color = Color.argb(235, 0, 0, 0)
             rectTmp.set(cx - eyeHalfW - 8f, cy - 80f, cx + eyeHalfW + 8f, cy - 2f)
             cvs.drawRect(rectTmp, solidPaint)
+            strokePaint.color = primaryColor
+            strokePaint.strokeWidth = 4f
+            cvs.drawLine(cx - eyeHalfW, cy - 2f, cx + eyeHalfW, cy - 2f, strokePaint)
         }
         cvs.restore()
 
-        // Glowing upper + subtle lower cybernetic eyelashes & circuit ticks
-        val upperLash = Path().apply {
-            moveTo(cx - eyeHalfW - 6f, cy + 4f)
-            cubicTo(cx - eyeHalfW * 0.45f, cy - halfH * 1.24f, cx + eyeHalfW * 0.45f, cy - halfH * 1.24f, cx + eyeHalfW + 10f, cy)
-        }
-        glowStrokePaint.color = Color.argb(145, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
-        glowStrokePaint.strokeWidth = 10f
-        cvs.drawPath(upperLash, glowStrokePaint)
+        // Glowing crisp mecha frame outline (angular cyber armor bevel)
+        glowStrokePaint.color = Color.argb(135, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+        glowStrokePaint.strokeWidth = 9f
+        cvs.drawPath(eyePath, glowStrokePaint)
 
         strokePaint.color = primaryColor
-        strokePaint.strokeWidth = 4.6f
-        cvs.drawPath(upperLash, strokePaint)
+        strokePaint.strokeWidth = 4.2f
+        cvs.drawPath(eyePath, strokePaint)
 
-        // Lower delicate neon underline
-        val lowerLash = Path().apply {
-            moveTo(cx - eyeHalfW * 0.72f, cy + halfH * 0.56f)
-            quadTo(cx, cy + halfH * 1.05f, cx + eyeHalfW * 0.72f, cy + halfH * 0.54f)
-        }
-        strokePaint.color = Color.argb(175, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
-        strokePaint.strokeWidth = 2.4f
-        cvs.drawPath(lowerLash, strokePaint)
-
-        // Signature Alita neon wing lashes + circuit ticks at outer corner
-        val wingX = cx + dir * (eyeHalfW + 6f)
+        // Thick bright top visor rim + small side sensor notches
+        pathTmp.reset()
+        pathTmp.moveTo(innerEdge, cy + 6f)
+        pathTmp.lineTo(topFlatInner, cy - halfH)
+        pathTmp.lineTo(topFlatOuter, cy - halfH * 0.84f)
+        pathTmp.lineTo(outerEdge, cy - 2f)
         strokePaint.color = coreColor
+        strokePaint.strokeWidth = 5.4f
+        cvs.drawPath(pathTmp, strokePaint)
+
+        // Tiny futuristic HUD cheek bracket ticks at outer bottom corner
+        strokePaint.color = Color.argb(170, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
         strokePaint.strokeWidth = 2.6f
-        cvs.drawLine(wingX, cy - 2f, wingX + dir * 20f, cy - 14f, strokePaint)
-        cvs.drawLine(wingX - dir * 10f, cy - halfH * 0.35f, wingX + dir * 12f, cy - halfH * 0.58f, strokePaint)
-        solidPaint.color = primaryColor
-        cvs.drawCircle(wingX + dir * 22f, cy - 15f, 2.8f, solidPaint)
+        val tickX = outerEdge + dir * 10f
+        cvs.drawLine(tickX, cy + halfH * 0.42f, tickX - dir * 14f, cy + halfH * 0.72f, strokePaint)
+        cvs.drawLine(tickX + dir * 8f, cy + halfH * 0.48f, tickX - dir * 6f, cy + halfH * 0.78f, strokePaint)
 
         cvs.restore()
     }
 
+    private fun drawMechaBrow(
+        cvs: Canvas,
+        cx: Float,
+        cy: Float,
+        eyeHalfW: Float,
+        isLeft: Boolean,
+        shape: DeskBuddyEyeShape,
+        openFactor: Float,
+        primaryColor: Int,
+        coreColor: Int
+    ) {
+        val dir = if (isLeft) -1f else 1f
+        val baseLift = when (shape) {
+            DeskBuddyEyeShape.ALERT, DeskBuddyEyeShape.WIDE_EYES -> 78f
+            DeskBuddyEyeShape.ANGRY -> 54f
+            DeskBuddyEyeShape.SLEEPY -> 44f
+            else -> 64f
+        } * openFactor.coerceIn(0.55f, 1.15f)
+        val innerTilt = when (shape) {
+            DeskBuddyEyeShape.ANGRY -> 18f
+            DeskBuddyEyeShape.WIDE_EYES, DeskBuddyEyeShape.ALERT -> -12f
+            DeskBuddyEyeShape.BLUSH -> -8f
+            DeskBuddyEyeShape.CURIOUS -> if (isLeft) -10f else 4f
+            else -> 2f
+        }
+
+        val innerX = cx - dir * eyeHalfW * 0.86f
+        val midX = cx - dir * eyeHalfW * 0.12f
+        val outerX = cx + dir * eyeHalfW * 0.92f
+        val browY = cy - baseLift
+
+        pathTmp.reset()
+        pathTmp.moveTo(innerX, browY + innerTilt)
+        pathTmp.lineTo(midX, browY - 10f)
+        pathTmp.lineTo(outerX, browY + 4f)
+
+        glowStrokePaint.color = Color.argb(120, Color.red(primaryColor), Color.green(primaryColor), Color.blue(primaryColor))
+        glowStrokePaint.strokeWidth = 11f
+        cvs.drawPath(pathTmp, glowStrokePaint)
+
+        strokePaint.color = primaryColor
+        strokePaint.strokeWidth = 6.2f
+        cvs.drawPath(pathTmp, strokePaint)
+
+        strokePaint.color = coreColor
+        strokePaint.strokeWidth = 2.6f
+        cvs.drawPath(pathTmp, strokePaint)
+    }
+
+    private fun drawBlushCheeks(
+        cvs: Canvas,
+        style: DeskBuddyStyle,
+        pulse: Float
+    ) {
+        val blushAlpha = (180 + (pulse * 55f).toInt()).coerceIn(150, 235)
+        val pinkGlow = Color.argb(95, 255, 82, 146)
+        val pinkBright = Color.argb(blushAlpha, 255, 108, 168)
+
+        val leftCx = TEX_WIDTH * 0.27f
+        val rightCx = TEX_WIDTH * 0.73f
+        val blushY = TEX_HEIGHT * 0.72f
+
+        for (cx in floatArrayOf(leftCx, rightCx)) {
+            when (style) {
+                DeskBuddyStyle.PIXEL_OLED -> {
+                    glowPaint.color = pinkGlow
+                    rectTmp.set(cx - 34f, blushY - 12f, cx + 34f, blushY + 12f)
+                    cvs.drawRoundRect(rectTmp, 6f, 6f, glowPaint)
+                    solidPaint.color = pinkBright
+                    for (i in -2..1) {
+                        val px = cx + i * 15f
+                        val py = blushY - 6f + (if ((i and 1) == 0) 0f else 8f)
+                        rectTmp.set(px, py, px + 11f, py + 11f)
+                        cvs.drawRoundRect(rectTmp, 3f, 3f, solidPaint)
+                    }
+                }
+                else -> {
+                    // Glowing soft pink OLED cheek halo + crisp diagonal anime blush strokes ///
+                    glowPaint.color = pinkGlow
+                    rectTmp.set(cx - 42f, blushY - 16f, cx + 42f, blushY + 16f)
+                    cvs.drawOval(rectTmp, glowPaint)
+                    strokePaint.color = pinkBright
+                    strokePaint.strokeWidth = 5.2f
+                    for (offset in floatArrayOf(-20f, 0f, 20f)) {
+                        cvs.drawLine(cx + offset - 8f, blushY + 12f, cx + offset + 9f, blushY - 12f, strokePaint)
+                    }
+                }
+            }
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────────
-    // Notification Glyphs (?, !, Message Bubble, Zz, Sparkle)
+    // Notification Glyphs (?, !, Message Bubble, Zz, Sparkle, Heart)
     // ─────────────────────────────────────────────────────────────────────────────
 
     private fun drawNotificationBadge(
@@ -1008,6 +1159,17 @@ class DeskBuddyEyesRenderer {
                 solidPaint.color = coreColor
                 cvs.drawPath(pathTmp, solidPaint)
             }
+            DeskBuddyBadge.HEART -> {
+                pathTmp.reset()
+                pathTmp.moveTo(bx, by + 16f)
+                pathTmp.cubicTo(bx - 24f, by + 2f, bx - 22f, by - 18f, bx, by - 6f)
+                pathTmp.cubicTo(bx + 22f, by - 18f, bx + 24f, by + 2f, bx, by + 16f)
+                pathTmp.close()
+                glowPaint.color = Color.argb(110, 255, 92, 152)
+                cvs.drawPath(pathTmp, glowPaint)
+                solidPaint.color = Color.argb(alpha, 255, 110, 170)
+                cvs.drawPath(pathTmp, solidPaint)
+            }
             DeskBuddyBadge.SLEEP_ZZ -> {
                 strokePaint.color = badgeColor
                 strokePaint.strokeWidth = 4.5f
@@ -1034,9 +1196,10 @@ class DeskBuddyEyesRenderer {
 
         private const val BLINK_INTERVAL_MS = 3800L
         private const val BLINK_DURATION_MS = 190L
+        private const val IDLE_EXPRESSION_CYCLE_MS = 28_000L
 
         /**
-         * Maps any canonical/raw emotion (from chat, touch, or webhook notification)
+         * Maps any canonical/raw emotion (from chat, touch, caress, or webhook notification)
          * to its Desk Buddy eyes-only preset.
          */
         fun resolveEyePreset(rawEmotion: String): DeskBuddyEyePreset {
@@ -1052,6 +1215,17 @@ class DeskBuddyEyesRenderer {
                     shape = DeskBuddyEyeShape.ALERT,
                     badge = DeskBuddyBadge.ALERT,
                     isAlertColor = true
+                )
+                Live2dEmotion.EMOTION_GROS_YEUX -> DeskBuddyEyePreset(
+                    canonicalEmotion = canonical,
+                    shape = DeskBuddyEyeShape.WIDE_EYES,
+                    badge = DeskBuddyBadge.SPARKLE
+                )
+                Live2dEmotion.EMOTION_ROUGIR -> DeskBuddyEyePreset(
+                    canonicalEmotion = canonical,
+                    shape = DeskBuddyEyeShape.BLUSH,
+                    badge = DeskBuddyBadge.HEART,
+                    hasBlush = true
                 )
                 Live2dEmotion.EMOTION_JOIE -> DeskBuddyEyePreset(
                     canonicalEmotion = canonical,
@@ -1117,6 +1291,24 @@ class DeskBuddyEyesRenderer {
         }
 
         /**
+         * Spontaneous idle lifecycle when Desk Buddy is in `normal` mode:
+         * periodically winks, opens wide eyes ("gros yeux"), or briefly dozes off ("s'endort"),
+         * while always yielding immediately when an active notification, touch, or chat emotion is set.
+         */
+        fun computeIdleExpression(nowMs: Long, baseCanonicalEmotion: String): String {
+            if (baseCanonicalEmotion != Live2dEmotion.EMOTION_NORMAL) {
+                return baseCanonicalEmotion
+            }
+            val phaseMs = Math.floorMod(nowMs, IDLE_EXPRESSION_CYCLE_MS)
+            return when {
+                phaseMs in 6_000L until 7_900L -> Live2dEmotion.EMOTION_CLIN_DOEIL
+                phaseMs in 13_500L until 16_000L -> Live2dEmotion.EMOTION_GROS_YEUX
+                phaseMs in 20_500L until 26_000L -> Live2dEmotion.EMOTION_FATIGUE
+                else -> Live2dEmotion.EMOTION_NORMAL
+            }
+        }
+
+        /**
          * Periodic organic left-to-right eye saccade pattern so Desk Buddy glances around naturally.
          */
         fun computeIdleGaze(nowMs: Long, canonicalEmotion: String): DeskBuddyGazeState {
@@ -1154,7 +1346,8 @@ class DeskBuddyEyesRenderer {
         fun computeBlinkWeight(nowMs: Long, canonicalEmotion: String): Float {
             if (canonicalEmotion == Live2dEmotion.EMOTION_CALME ||
                 canonicalEmotion == Live2dEmotion.EMOTION_JOIE ||
-                canonicalEmotion == Live2dEmotion.EMOTION_ETIREMENT
+                canonicalEmotion == Live2dEmotion.EMOTION_ETIREMENT ||
+                canonicalEmotion == Live2dEmotion.EMOTION_ROUGIR
             ) {
                 return 0f
             }

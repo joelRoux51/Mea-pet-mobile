@@ -232,6 +232,104 @@ object TouchReactionHelper {
             else -> baseText
         }
     }
+
+    private val DESK_BUDDY_SURPRISE = LocalizedPhrase(
+        fr = "Oh ! Tu m'as surpris !",
+        en = "Whoa! You surprised me!",
+        es = "¡Oh! ¡Me has sorprendido!",
+        zh = "唔！吓我一跳！"
+    )
+
+    private val DESK_BUDDY_ANNOYED = LocalizedPhrase(
+        fr = "Hé, doucement avec l'écran...",
+        en = "Hey, easy on the screen...",
+        es = "Oye, más suave con la pantalla...",
+        zh = "喂，轻一点碰屏幕…"
+    )
+
+    private val DESK_BUDDY_ANGRY_POOL = listOf(
+        LocalizedPhrase(
+            fr = "Hé ! Arrête de me tapoter !",
+            en = "Hey! Stop poking me!",
+            es = "¡Oye! ¡Deja de darme toques!",
+            zh = "喂！别一直戳我！"
+        ),
+        LocalizedPhrase(
+            fr = "Tu cherches à m'énerver ?!",
+            en = "Are you trying to make me mad?!",
+            es = "¿Intentas hacerme enfadar?!",
+            zh = "你是想惹我生气吗？！"
+        ),
+        LocalizedPhrase(
+            fr = "Bon, ça suffit maintenant !",
+            en = "Okay, that's enough now!",
+            es = "¡Bueno, ya basta!",
+            zh = "够了哦，别再戳了！"
+        )
+    )
+
+    private val CARESS_PHRASES = listOf(
+        LocalizedPhrase(
+            fr = "Oh... c'est agréable... ///",
+            en = "Aww... that feels nice... ///",
+            es = "Oh... qué agradable... ///",
+            zh = "唔…好舒服…///"
+        ),
+        LocalizedPhrase(
+            fr = "Héhé... tu me fais rougir ! ///",
+            en = "Hehe... you're making me blush! ///",
+            es = "Jeje... ¡me haces sonrojar! ///",
+            zh = "嘿嘿…你让我脸红啦！///"
+        )
+    )
+
+    private fun pickLocalized(phrase: LocalizedPhrase, langCode: String): String =
+        when (langCode.lowercase(Locale.ROOT).take(2)) {
+            "en" -> phrase.en
+            "es" -> phrase.es
+            "zh" -> phrase.zh
+            else -> phrase.fr
+        }
+
+    fun deskBuddyReactionForTap(tapCount: Int, langCode: String, picker: (Int) -> Int): TapReaction {
+        return when {
+            tapCount <= 1 -> TapReaction(
+                filename = "",
+                text = pickLocalized(DESK_BUDDY_SURPRISE, langCode),
+                emotion = Live2dEmotion.EMOTION_SURPRISE,
+                stage = 0,
+                tapCount = tapCount
+            )
+            tapCount == 2 -> TapReaction(
+                filename = "",
+                text = pickLocalized(DESK_BUDDY_ANNOYED, langCode),
+                emotion = Live2dEmotion.EMOTION_SERIEUX,
+                stage = 1,
+                tapCount = tapCount
+            )
+            else -> {
+                val idx = picker(DESK_BUDDY_ANGRY_POOL.size).coerceIn(0, DESK_BUDDY_ANGRY_POOL.lastIndex)
+                TapReaction(
+                    filename = "",
+                    text = pickLocalized(DESK_BUDDY_ANGRY_POOL[idx], langCode),
+                    emotion = Live2dEmotion.EMOTION_COLERE,
+                    stage = 2,
+                    tapCount = tapCount
+                )
+            }
+        }
+    }
+
+    fun caressReaction(langCode: String, picker: (Int) -> Int = { 0 }): TapReaction {
+        val idx = picker(CARESS_PHRASES.size).coerceIn(0, CARESS_PHRASES.lastIndex)
+        return TapReaction(
+            filename = "",
+            text = pickLocalized(CARESS_PHRASES[idx], langCode),
+            emotion = Live2dEmotion.EMOTION_ROUGIR,
+            stage = 0,
+            tapCount = 0
+        )
+    }
 }
 
 /**
@@ -280,6 +378,24 @@ class TouchReactionTracker(
             stage = stage,
             tapCount = consecutiveTaps
         )
+    }
+
+    /**
+     * Desk Buddy screen tap escalation:
+     * Tap 1 -> surprised (`surprise`), Tap 2 -> annoyed (`serieux`), Tap 3+ -> angry (`colere`).
+     */
+    @Synchronized
+    fun onDeskBuddyTap(
+        nowMs: Long,
+        langCode: String,
+        picker: (Int) -> Int
+    ): TouchReactionHelper.TapReaction {
+        if (lastTapMs > 0L && (nowMs - lastTapMs) > tapResetMs) {
+            consecutiveTaps = 0
+        }
+        consecutiveTaps += 1
+        lastTapMs = nowMs
+        return TouchReactionHelper.deskBuddyReactionForTap(consecutiveTaps, langCode, picker)
     }
 
     @Synchronized
