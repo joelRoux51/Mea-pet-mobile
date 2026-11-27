@@ -877,13 +877,13 @@ class DeskBuddyEyesRenderer {
         }
         val halfH = max(14f, 52f * openFactor * heightFactor)
 
-        // Sharp angular hexagonal/octagonal anime mecha eye socket
-        val innerEdge = -dir * eyeHalfW * 0.84f
-        val outerEdge = dir * eyeHalfW * 0.92f
-        val topFlatInner = -dir * eyeHalfW * 0.42f
-        val topFlatOuter = dir * eyeHalfW * 0.56f
-        val botFlatInner = -dir * eyeHalfW * 0.46f
-        val botFlatOuter = dir * eyeHalfW * 0.48f
+        // Sharp angular hexagonal/octagonal anime mecha eye socket centered at cx
+        val innerEdge = cx - dir * eyeHalfW * 0.84f
+        val outerEdge = cx + dir * eyeHalfW * 0.92f
+        val topFlatInner = cx - dir * eyeHalfW * 0.42f
+        val topFlatOuter = cx + dir * eyeHalfW * 0.56f
+        val botFlatInner = cx - dir * eyeHalfW * 0.46f
+        val botFlatOuter = cx + dir * eyeHalfW * 0.48f
 
         val eyePath = Path().apply {
             moveTo(innerEdge, cy + 6f)
